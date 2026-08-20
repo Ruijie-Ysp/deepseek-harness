@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-20-ocr-preprocess.md
+2026-08-20-ocr-preprocess.md: 64b1fdc037d56a4d5313f199f5d82844eb6b335b
+2026-08-20-ocr-preprocess.zh.md: 6c722ff2889b7da6a3ee67367228b4b3a280b20e

@@ -248,6 +248,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'The interface returns path-only completion candidates within the addressed Agent cwd through its unary Remote contract; providers own namespace access and ranking without reading file contents.',
   },
   {
+    key: 'ocrPreprocess',
+    pkg: 'ocr-preprocess',
+    title: 'Automatic OCR preprocessing of image messages',
+    mode: 'core',
+    consumers: ['host-runtime', 'acp', 'llm-replay'],
+    note: 'At pre-step, converts image blocks to recognized text when the serving model does not accept images; admission gates consult handlesImages() to admit images for text-only routes.',
+  },
+  {
     key: 'sessionReferenceResolver',
     pkg: 'session-reference',
     title: 'Cross-session snapshot preparation',

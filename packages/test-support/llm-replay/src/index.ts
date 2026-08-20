@@ -11,6 +11,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { delimiter as pathDelimiter } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-compaction'
+import type {} from '@deepseek-ai/dsh-ocr-preprocess/types'
 import { decodeStorageRecord } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type {
@@ -242,6 +243,29 @@ export function deriveReplayScript(events: SessionEvent[]): ReplayEntry[] {
         chunks.push({ type: 'finish', reason: { kind: 'stop' } })
         script.push({ kind: 'chunks', chunks })
       }
+      continue
+    }
+    if (event.type === 'session/ocr-request') {
+      close(currentKey, current)
+      currentKey = undefined
+      current = []
+      // The OCR call is an auxiliary stream whose chunks never reach the loop
+      // as assistant/chunk events; the recorded rawOutput restores them.
+      // JSONL decoding crosses an untyped durable boundary, so retain its wider
+      // shape even though current in-process producers enforce this correlation.
+      const persisted: {
+        readonly rawOutput?: readonly ContentBlock[]
+      } = event.data
+      if (persisted.rawOutput === undefined || persisted.rawOutput.length === 0) {
+        throw new Error('llm-replay: session/ocr-request carries no rawOutput')
+      }
+      const chunks: StreamChunk[] = []
+      for (const [index, block] of persisted.rawOutput.entries()) {
+        chunks.push({ type: 'block-start', index, blockType: block.type })
+        chunks.push({ type: 'block-end', index, block })
+      }
+      chunks.push({ type: 'finish', reason: { kind: 'stop' } })
+      script.push({ kind: 'chunks', chunks })
       continue
     }
     if (event.type !== 'assistant/chunk') continue

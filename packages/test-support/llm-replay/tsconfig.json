@@ -18,6 +18,9 @@
       "path": "../../compaction/compaction"
     },
     {
+      "path": "../../context/ocr-preprocess"
+    },
+    {
       "path": "../../llm/llm"
     },
     {

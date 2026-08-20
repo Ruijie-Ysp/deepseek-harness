@@ -1,0 +1,37 @@
+# Test-only composition: keep ocr-preprocess opt-in while exercising its real
+# Loader/app path with a deterministic two-route adapter. The main route is
+# text-only; the OCR route accepts images and recognizes them.
+- id: ocr-preprocess-mock-llm
+  name: './ocr-preprocess-mock-llm.ts'
+
+- id: subprocess
+  name: '@deepseek-ai/dsh-subprocess-local'
+
+- id: bash
+  name: '@deepseek-ai/dsh-bash-local'
+
+- id: ocr-preprocess
+  name: '@deepseek-ai/dsh-ocr-preprocess'
+  config:
+    provider: ocr-mock
+    model: ocr-mock
+
+- id: agent-spine
+  name: '@deepseek-ai/dsh-agent-spine-demo'
+  config:
+    agents:
+      - id: main
+        provider: main-mock
+        model: main-mock
+        cwd: !!js process.cwd()
+    persona: 'Test the ocr-preprocess plugin.'
+    workspaceContext: false
+
+- id: persistence
+  name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  config:
+    root: './.sessions'
+    compression: 'none'
+
+- id: checkpoint-policy
+  name: '@deepseek-ai/dsh-session-checkpoint-policy'

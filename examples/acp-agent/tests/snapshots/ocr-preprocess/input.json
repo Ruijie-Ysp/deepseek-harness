@@ -1,0 +1,18 @@
+{
+  "steps": [
+    { "op": "initialize" },
+    { "op": "newSession" },
+    {
+      "op": "promptContent",
+      "content": [
+        { "type": "text", "text": "OCR the text in this image, then reply with exactly " },
+        {
+          "type": "image",
+          "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
+          "mimeType": "image/png"
+        },
+        { "type": "text", "text": "the single word DONE." }
+      ]
+    }
+  ]
+}

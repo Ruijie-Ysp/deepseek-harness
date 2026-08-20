@@ -1275,7 +1275,7 @@ export interface ReplayModelConfig {
 
 Depends on: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
 
-Source: [`packages/test-support/llm-replay/src/index.ts:776`](../packages/test-support/llm-replay/src/index.ts)
+Source: [`packages/test-support/llm-replay/src/index.ts:800`](../packages/test-support/llm-replay/src/index.ts)
 
 <a id="deepseek-aidsh-llm-retry"></a>
 
@@ -1420,6 +1420,24 @@ export interface Config {
 ```
 
 Source: [`packages/feedback/message-feedback/src/index.ts:49`](../packages/feedback/message-feedback/src/index.ts)
+
+<a id="deepseek-aidsh-ocr-preprocess"></a>
+
+## `@deepseek-ai/dsh-ocr-preprocess`
+
+Requires: `llm`
+
+```ts config-catalog
+/** Composition entry for the OCR route. */
+export interface Config {
+  /** Registered provider route of the OCR model. */
+  provider: string
+  /** Provider-owned OCR model id. */
+  model: string
+}
+```
+
+Source: [`packages/context/ocr-preprocess/src/index.ts:55`](../packages/context/ocr-preprocess/src/index.ts)
 
 <a id="deepseek-aidsh-permission-presets"></a>
 

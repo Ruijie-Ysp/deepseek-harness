@@ -55,6 +55,7 @@ const SESSION_QUERY_CONFIG = fileURLToPath(new URL('../session-query.cordis.yml'
 const IMAGE_CONFIG = fileURLToPath(new URL('../image.cordis.yml', import.meta.url))
 const IMAGE_OFFLOAD_CONFIG = fileURLToPath(new URL('./fixtures/image-offload.cordis.yml', import.meta.url))
 const IMAGE_TEXT_ROUTE_CONFIG = fileURLToPath(new URL('../image-text-route.cordis.yml', import.meta.url))
+const OCR_PREPROCESS_CONFIG = fileURLToPath(new URL('../ocr-preprocess.cordis.yml', import.meta.url))
 const PTY_CONFIG = fileURLToPath(new URL('../pty.cordis.yml', import.meta.url))
 const DEPTH_TWO_CONFIG = fileURLToPath(new URL('../depth-two.cordis.yml', import.meta.url))
 const CHILD_QUESTION_CONFIG = fileURLToPath(new URL('../child-question.cordis.yml', import.meta.url))
@@ -263,6 +264,17 @@ const SCENARIOS: Scenario[] = [
     recorded: false,
     headerClass: 'image',
     configPath: IMAGE_CONFIG,
+  },
+  // Authored keyless replay of automatic OCR preprocessing: an inline image is
+  // admitted to a text-only route because ocr-preprocess handles images, the
+  // OCR call replaces the image with recognized text before the main model
+  // sees it, and the durable log records the OCR call for replay fidelity.
+  {
+    name: 'ocr-preprocess',
+    hasModelTurn: true,
+    recorded: false,
+    headerClass: 'image-text-route',
+    configPath: OCR_PREPROCESS_CONFIG,
   },
   {
     name: 'pty-tools',

@@ -6,6 +6,9 @@ import { isImageAdmissionError } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef, ImageMediaType, SaveImageAttachment } from '@deepseek-ai/dsh-attachment'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+// Side-effect type import: resolves `ctx.get('ocrPreprocess')` without a value
+// dependency on the seam (optional composition).
+import type {} from '@deepseek-ai/dsh-ocr-preprocess'
 
 /** Raster formats shared by ACP image blocks and the core attachment vocabulary. */
 const IMAGE_MEDIA_TYPES: readonly ImageMediaType[] = [
@@ -98,7 +101,10 @@ export async function supportsAcpImagePrompts(
   if (!attachments.imageLimits.mediaTypes.some(mediaType => IMAGE_MEDIA_TYPES.includes(mediaType))) return false
   try {
     const info = await llm.resolveModelInfo(provider, model)
-    return info.inputModalities?.includes('image') === true
+    if (info.inputModalities?.includes('image') === true) return true
+    // OCR preprocessing converts images to text at pre-step, so a text-only
+    // route can still accept inline image prompts.
+    return ctx.get('ocrPreprocess')?.handlesImages() === true
   } catch {
     return false
   }
@@ -152,7 +158,10 @@ export async function admitAcpPrompt(
   if (images.length > 0) {
     const attachments = ctx.get('attachments')
     if (attachments === undefined) throw new AcpContentError('no attachment store is mounted', 'invalid')
-    await assertImageRoute(ctx, agent, signal)
+    // OCR preprocessing converts the admitted image to text at pre-step, so a
+    // text-only current model can accept it.
+    const ocrHandlesImages = ctx.get('ocrPreprocess')?.handlesImages() === true
+    if (!ocrHandlesImages) await assertImageRoute(ctx, agent, signal)
     signal.throwIfAborted()
     try {
       refs = await attachments.saveImages(images)
