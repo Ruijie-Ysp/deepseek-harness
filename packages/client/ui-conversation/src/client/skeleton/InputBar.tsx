@@ -61,6 +61,8 @@ export function InputBar({
   // current; the bar renders the same DOM inert instead of a parallel tree.
   const live = input !== undefined && keyboard !== undefined && inputActions !== undefined
   const draft = input?.draft ?? ''
+  const edit = input?.edit
+  const cancelEdit = (): void => { inputActions?.cancelEdit() }
   const attachments = useMemo(
     () => input === undefined || draftImages === undefined ? [] : draftImages(input.imageIds),
     [draftImages, input?.imageIds],
@@ -642,6 +644,19 @@ export function InputBar({
             size: imageSizeText(imageLimits.maxImageBytes),
           },
         })}
+        {edit !== undefined && (
+          <div className={css.editBanner} role="status" data-edit-banner>
+            <span>{t('edit.banner')}</span>
+            <button
+              type="button"
+              className={css.editBannerCancel}
+              aria-label={t('edit.cancel')}
+              onClick={cancelEdit}
+            >
+              {t('edit.cancel')}
+            </button>
+          </div>
+        )}
         {/* One scrollport, two text layers. The hidden mirror renders draft+'\n' and stretches the
             stack to the draft's FULL height (counting rows by '\n' cannot see soft wraps); the
             absolutely-positioned backdrop and textarea ride that height, and .scroll — capped at 14

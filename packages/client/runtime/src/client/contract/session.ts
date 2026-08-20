@@ -52,6 +52,23 @@ export interface ISession {
     attachmentId: AttachmentIdType,
   ): Promise<RpcResult<{ attachment: ImageAttachmentRef; data: Uint8Array }>>
   /**
+   * Rewrite one durable user message and regenerate the conversation from it.
+   * `atSeq` names the current surface node projecting the human message being
+   * edited; the host queues the edited text for the next turn and the loop
+   * logs `user/edit`, discarding everything after the target from model
+   * history. Text content only: the target's non-text blocks (images) are
+   * preserved verbatim and reused.
+   * @param content - the rewritten text blocks.
+   * @param atSeq - seq of the user message (or prior edit) to rewrite.
+   * @param signal - optional cancellation for the complete Host admission.
+   * @returns acceptance, or the business error.
+   */
+  editPrompt(
+    content: { type: 'text'; text: string }[],
+    atSeq: number,
+    signal?: AbortSignal,
+  ): Promise<RpcResult<{ accepted: true }>>
+  /**
    * Apply one edit, remove, or strict steer action to a still-pending queue occurrence.
    * @param itemId - agent-owned inbox occurrence identity.
    * @param action - requested queue operation.

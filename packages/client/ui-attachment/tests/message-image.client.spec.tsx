@@ -198,7 +198,7 @@ describe('ImageGallery', () => {
         addImages: vi.fn(() => true),
         removeImage: vi.fn(),
         pruneImages: vi.fn(),
-        submit: vi.fn(),
+        submit: vi.fn(), beginEdit: vi.fn(), cancelEdit: vi.fn(),
       },
       images: [{ attachment }],
       loadImage,

@@ -721,6 +721,8 @@ describe('stabilizeFixtureMessageIds', () => {
       oldAssistant: '44444444-4444-4444-8444-444444444444',
       freshTool: '55555555-5555-4555-8555-555555555555',
       oldTool: '66666666-6666-4666-8666-666666666666',
+      freshEdit: '11112222-3333-4444-8555-666677778888',
+      oldEdit: '99990000-1111-4222-8333-444455556666',
       oldMalformed: '77777777-7777-4777-8777-777777777777',
     } as const
     const message = (id: string, role: string, text: string): Record<string, unknown> => ({
@@ -729,7 +731,7 @@ describe('stabilizeFixtureMessageIds', () => {
       content: [{ type: 'text', text }],
       source: { kind: role === 'user' ? 'user' : 'model' },
     })
-    const log = (userId: string, assistantId: string, toolId: string, malformedId: string): string => [
+    const log = (userId: string, assistantId: string, toolId: string, editId: string, malformedId: string): string => [
       JSON.stringify({ type: 'session', id: 'same', cwd: '{{cwd}}' }),
       JSON.stringify({
         type: 'agent/inbox/spliced',
@@ -743,6 +745,7 @@ describe('stabilizeFixtureMessageIds', () => {
       JSON.stringify({ type: 'user/message', data: message(userId, 'user', 'user') }),
       JSON.stringify({ type: 'assistant/message', data: { message: message(assistantId, 'assistant', 'assistant') } }),
       JSON.stringify({ type: 'tool/result', data: { message: message(toolId, 'tool', 'tool') } }),
+      JSON.stringify({ type: 'user/edit', data: { message: message(editId, 'user', 'edited'), replacesSeq: 1 } }),
       JSON.stringify({ type: 'turn/start', data: { id: userId } }),
       JSON.stringify({ type: 'steering/message', data: message(userId, 'user', 'obsolete') }),
       JSON.stringify({ type: 'user/message', data: { ...message(userId, 'user', 'malformed'), source: null } }),
@@ -753,8 +756,8 @@ describe('stabilizeFixtureMessageIds', () => {
     ].join('\n')
 
     const stable = stabilizeFixtureMessageIds(
-      [log(ids.freshUser, ids.freshAssistant, ids.freshTool, 'not-a-uuid')],
-      [log(ids.oldUser, ids.oldAssistant, ids.oldTool, ids.oldMalformed)],
+      [log(ids.freshUser, ids.freshAssistant, ids.freshTool, ids.freshEdit, 'not-a-uuid')],
+      [log(ids.oldUser, ids.oldAssistant, ids.oldTool, ids.oldEdit, ids.oldMalformed)],
     )[0] as string
     const records = stable.trim().split('\n').map(line => JSON.parse(line) as Record<string, unknown>)
 
@@ -764,10 +767,11 @@ describe('stabilizeFixtureMessageIds', () => {
     expect((records[2]?.data as { id: string }).id).toBe(ids.oldUser)
     expect((records[3]?.data as { message: { id: string } }).message.id).toBe(ids.oldAssistant)
     expect((records[4]?.data as { message: { id: string } }).message.id).toBe(ids.oldTool)
-    expect((records[5]?.data as { id: string }).id).toBe(ids.freshUser)
+    expect((records[5]?.data as { message: { id: string } }).message.id).toBe(ids.oldEdit)
     expect((records[6]?.data as { id: string }).id).toBe(ids.freshUser)
     expect((records[7]?.data as { id: string }).id).toBe(ids.freshUser)
-    expect((records[8]?.data as { id: string }).id).toBe('not-a-uuid')
+    expect((records[8]?.data as { id: string }).id).toBe(ids.freshUser)
+    expect((records[9]?.data as { id: string }).id).toBe('not-a-uuid')
   })
 
   it('matches cwd-bearing messages only after the fresh log reaches fixture-ready form', () => {

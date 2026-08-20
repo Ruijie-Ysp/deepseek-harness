@@ -403,7 +403,7 @@ describe('DetailsPanel Output section (search)', () => {
           addImages: () => true,
           removeImage: () => {},
           pruneImages: () => {},
-          submit: () => {},
+          submit: () => {}, beginEdit: () => {}, cancelEdit: () => {},
         }}
         useProjection={(() => undefined)}
         useStore={bindSnapshotSelector(chat)}

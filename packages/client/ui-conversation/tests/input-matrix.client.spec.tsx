@@ -317,3 +317,17 @@ describe('matrix row: takeover (orthogonal axis)', () => {
     expect(shell.snapshot.draft).toBe('/goal ')
   })
 })
+
+describe('matrix row: message edit mode', () => {
+  it('loads the message text, shows the banner, and cancel clears edit mode', () => {
+    const { view, textarea, shell } = bench()
+    act(() => { shell.beginEdit(5, 'rewritten prompt') })
+    expect((textarea as HTMLTextAreaElement).value).toBe('rewritten prompt')
+    expect(shell.snapshot.edit).toEqual({ atSeq: 5 })
+    expect(view.getByText('正在编辑历史消息，发送后将重新生成回复')).toBeTruthy()
+
+    fireEvent.click(view.getByRole('button', { name: '取消编辑' }))
+    expect(shell.snapshot.edit).toBeUndefined()
+    expect(view.queryByText('正在编辑历史消息，发送后将重新生成回复')).toBeNull()
+  })
+})

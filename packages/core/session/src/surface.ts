@@ -14,6 +14,7 @@ import type { SessionEvent, SurfaceEvent, SurfaceEventType, SurfaceOp } from './
 /** Runtime counterpart of the message-producing event union. */
 const SURFACE_EVENT_TYPES = new Set<string>([
   'user/message',
+  'user/edit',
   'assistant/message',
   'tool/result',
 ])
@@ -21,7 +22,7 @@ const SURFACE_EVENT_TYPES = new Set<string>([
 /**
  * Whether an event type can join the model-visible surface.
  * @param type - event type to test.
- * @returns true for one of the three message-producing event types.
+ * @returns true for one of the four message-producing event types.
  */
 export function isSurfaceEligibleType(type: string): boolean {
   return SURFACE_EVENT_TYPES.has(type)
@@ -95,6 +96,11 @@ export function deriveEventMessage(event: SessionEvent): Message | null {
     // ../../../../.agents/notes/implemented/simplification/2026-07-20-unwrap-injected-content-envelopes.md
     case 'user/message': {
       return event.data
+    }
+    case 'user/edit': {
+      // The edited message projects in user role at the replaced position,
+      // verbatim like the ordinary user/message it supersedes.
+      return event.data.message
     }
     case 'assistant/message': {
       // Skip an empty-content assistant/message: it exists only to host a

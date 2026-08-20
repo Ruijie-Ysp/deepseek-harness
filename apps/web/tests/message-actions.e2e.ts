@@ -121,7 +121,22 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
     await branchButtons.first().focus()
     await expect.poll(() => page.getByRole('tooltip').textContent(), { timeout: 5_000 })
       .toBe('Available only on the last message of a completed turn')
-    await expect.poll(() => page.getByRole('button', { name: 'Edit' }).count(), { timeout: 5_000 }).toBe(0)
+    // Text-only user bubbles carry the rewrite action; assistant answers do not.
+    await expect.poll(() => page.getByRole('button', { name: 'Edit message' }).count(), { timeout: 5_000 }).toBe(2)
+  }, 60_000)
+
+  it.skipIf(MODE === 'record')('opens composer edit mode from a user bubble and cancels cleanly', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-message-edit'))
+    const editButtons = page.getByRole('button', { name: 'Edit message' })
+    await expect.poll(() => editButtons.count(), { timeout: 10_000 }).toBe(2)
+    // Reveal the actions row, then load the first user prompt into the composer.
+    await editButtons.first().focus()
+    await editButtons.first().click()
+    await expect.poll(() => page.getByText('Editing a past message — sending will regenerate the reply').count(), { timeout: 5_000 }).toBe(1)
+    await expect.poll(() => page.locator('textarea').inputValue(), { timeout: 5_000 }).toBe(PROMPT)
+    // Cancel leaves edit mode without issuing a model call.
+    await page.getByRole('button', { name: 'Cancel edit' }).click()
+    await expect.poll(() => page.getByText('Editing a past message — sending will regenerate the reply').count(), { timeout: 5_000 }).toBe(0)
   }, 60_000)
 
   it.skipIf(MODE === 'record')('matches the conversation aria golden with IconActions and clocks', async () => {

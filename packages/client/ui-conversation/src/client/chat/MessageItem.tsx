@@ -6,8 +6,9 @@
 import { memo, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
-  ModelRetryNode, TurnErrorNode, UserMessageNode,
+  ModelRetryNode, SteeringMessageNode, TurnErrorNode, UserEditMessageNode, UserMessageNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { JsonBlock, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
 import { ReferenceIcon } from '../reference/ReferenceIcon.tsx'
@@ -214,7 +215,7 @@ function projectUserText(text: string, sessionLabels: readonly string[]): ReactN
 
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({
-  content, renderMessageImages, actions, pending = false, referenceLabels = [], t,
+  content, renderMessageImages, actions, pending = false, edited = false, referenceLabels = [], ocrImages = [], t,
 }: {
   content: readonly unknown[]
   renderMessageImages: ChatNodeOwnerProps['renderMessageImages']
@@ -222,8 +223,12 @@ function UserStyleBubble({
   actions?: (text: string) => ReactNode
   /** Whether this is the Host-authoritative pre-admission steering projection. */
   pending?: boolean
+  /** Whether this bubble is a human rewrite of an earlier message. */
+  edited?: boolean
   /** Exact session mention labels associated by the adjacent recall node. */
   referenceLabels?: readonly string[]
+  /** Image attachments OCR-preprocessed out of the message content, still rendered alongside it. */
+  ocrImages?: readonly { readonly attachment: ImageAttachmentRef }[]
   t: ChatViewSlotProps['t']
 }): ReactNode {
   const { text, images, rest } = contentParts(content)
@@ -232,8 +237,9 @@ function UserStyleBubble({
   return (
     <div className={css.userRow} data-pending-steering={pending || undefined} data-time-hover-root>
       <div className={css.userStack}>
-        {renderMessageImages({ images, align: 'end' })}
+        {renderMessageImages({ images: [...ocrImages, ...images], align: 'end' })}
         {showBubble && <div className={css.bubble}>
+          {edited && <span className={css.editedBadge}>{t('message.edited')}</span>}
           {projectUserText(text, referenceLabels)}
           {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
         </div>}
@@ -277,16 +283,32 @@ export function PendingSteeringBubble({ content, renderMessageImages, t }: {
   )
 }
 
+/**
+ * Whether one node's bubble is rewriteable: a settled human message carrying
+ * at least one text block. Non-text blocks (images) ride along unchanged —
+ * the host preserves them when it rebuilds the edited message.
+ */
+function editEnabled(node: {
+  kind: UserMessageNode['kind'] | SteeringMessageNode['kind'] | UserEditMessageNode['kind']
+  content: UserMessageNode['content']
+}): boolean {
+  if (node.kind === 'steering') return false
+  const { text } = contentParts(node.content)
+  return text !== ''
+}
+
 /** User and admitted-steering keyed Chat renderer. */
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, renderMessageImages, t,
+  node, renderMessageImages, inputActions, t,
 }: ChatNodeViewProps<'user' | 'steering'>) {
   const data = node.data
+  const editable = editEnabled(data)
   return (
     <UserStyleBubble
       content={data.content}
       renderMessageImages={renderMessageImages}
       {...data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }}
+      {...data.ocrImages === undefined ? {} : { ocrImages: data.ocrImages }}
       t={t}
       actions={text => (
         <MessageIconActions
@@ -294,6 +316,33 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
           time={data.time}
           clock="start"
           className={css.actions}
+          onEdit={editable ? () => inputActions.beginEdit(data.seq, text) : undefined}
+          t={t}
+        />
+      )}
+    />
+  )
+})
+
+/** Human rewrite of an earlier user message: the same user bubble plus an edited badge. */
+export const UserEditNodeView = memo(function UserEditNodeView({
+  node, renderMessageImages, inputActions, t,
+}: ChatNodeViewProps<'user-edit'>) {
+  const data = node.data
+  const editable = editEnabled(data)
+  return (
+    <UserStyleBubble
+      content={data.content}
+      renderMessageImages={renderMessageImages}
+      edited
+      t={t}
+      actions={text => (
+        <MessageIconActions
+          text={text}
+          time={data.time}
+          clock="start"
+          className={css.actions}
+          onEdit={editable ? () => inputActions.beginEdit(data.seq, text) : undefined}
           t={t}
         />
       )}

@@ -194,6 +194,20 @@ export interface TodoItem {
 }
 
 /**
+ * A human rewrite of an earlier durable user message: `message` replaces the
+ * surface node at `replacesSeq` and everything after it, and the loop runs one
+ * new turn against the rewritten input. The replaced transcript stays in the
+ * append-only log; only the model-visible surface (and the UI's edited node)
+ * shows the new version.
+ */
+export interface UserEditEvent {
+  /** The edited user-role message with a fresh identity, replacing the target. */
+  message: UserMessage
+  /** Seq of the surface node this edit rewrites — the targeted append-origin user message or a prior edit. */
+  replacesSeq: number
+}
+
+/**
  * Logged request state outside derived history: call config, system prompt, and
  * tools. The latest full `request/header` snapshot reconstructs it; canonical
  * empty optional fields are absent.
@@ -262,6 +276,14 @@ export interface SessionEventMap {
    * project their `content` verbatim; `source` tells them apart.
    */
   'user/message': UserMessage
+  /**
+   * A human rewrite of an earlier user message: the loop logs this event with a
+   * `replace` surfaceOp shadowing the targeted surface node and everything
+   * after it, then runs one new turn against `message`. The appended-only
+   * transcript keeps the original; `deriveMessages` projects the edited
+   * `message` in user role at the replaced position.
+   */
+  'user/edit': UserEditEvent
   /** Raw stream chunk — token-level replay fidelity. */
   'assistant/chunk': { turn: number; step: number; chunk: StreamChunk }
   /**
@@ -346,6 +368,7 @@ export type SessionEventType = keyof SessionEventMap
  */
 export type SurfaceEventType =
   | 'user/message'
+  | 'user/edit'
   | 'assistant/message'
   | 'tool/result'
 

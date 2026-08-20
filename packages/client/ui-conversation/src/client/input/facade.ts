@@ -92,6 +92,8 @@ export class SessionInputShell implements SessionInput {
     removeImage: (id) => { this.removeImage(id) },
     pruneImages: (ids) => { this.pruneImages(ids) },
     submit: () => { this.submit('queue') },
+    beginEdit: (atSeq, text) => { this.beginEdit(atSeq, text) },
+    cancelEdit: () => { this.cancelEdit() },
   }
 
   // Real wall clock: the typing-run merge window must actually expire in
@@ -105,6 +107,8 @@ export class SessionInputShell implements SessionInput {
   private disposed = false
   /** Draft persistence mirror (chat store write; receives the clipboard projection, never display-only ranges). */
   private mirrorFn: ((text: string) => void) | undefined
+  /** Edit-mode target: the durable message the next submit rewrites; null outside edit mode. */
+  editTarget: { atSeq: number } | null = null
 
   constructor(private readonly deps: SessionInputDeps) {
     this.state = createSnapshotStore<InputState>(this.compose())
@@ -167,6 +171,25 @@ export class SessionInputShell implements SessionInput {
     const submitted = new Set(imageIds)
     this.imageIds = this.imageIds.filter(id => !submitted.has(id))
     this.run(this.core.dispatch({ type: 'send-committed' }))
+  }
+
+  /**
+   * Enter edit mode for one durable user message: the draft adopts the
+   * message text and the next submit rewrites it (editPrompt instead of
+   * prompt). The edit target clears on a successful submit.
+   * @param atSeq - seq of the surface node projecting the edited message.
+   * @param text - the message text loaded into the draft.
+   */
+  beginEdit(atSeq: number, text: string): void {
+    this.editTarget = { atSeq }
+    this.setDraft(text)
+  }
+
+  /** Leave edit mode, keeping the current draft. */
+  cancelEdit(): void {
+    if (this.editTarget === null) return
+    this.editTarget = null
+    this.publish()
   }
 
   /** Undo the latest transaction (InputBar intercepts the platform chord). */
@@ -501,9 +524,13 @@ export class SessionInputShell implements SessionInput {
     pending.then(
       (outcome) => {
         if (this.dead(attempt)) return
-        if (outcome.kind === 'success' && imageIds.length > 0) {
-          const submitted = new Set(imageIds)
-          this.imageIds = this.imageIds.filter(id => !submitted.has(id))
+        if (outcome.kind === 'success') {
+          // The committed send is the rewrite: leave edit mode with the draft cleared.
+          this.editTarget = null
+          if (imageIds.length > 0) {
+            const submitted = new Set(imageIds)
+            this.imageIds = this.imageIds.filter(id => !submitted.has(id))
+          }
         }
         this.run(this.core.dispatch({
           type: 'submit-settled',
@@ -590,7 +617,12 @@ export class SessionInputShell implements SessionInput {
 
   private compose(): InputState {
     const core = this.core.state
-    return { ...core, imageIds: this.imageIds, queue: this.deps.queue?.getSnapshot() ?? EMPTY_QUEUE }
+    return {
+      ...core,
+      imageIds: this.imageIds,
+      queue: this.deps.queue?.getSnapshot() ?? EMPTY_QUEUE,
+      ...(this.editTarget === null ? {} : { edit: this.editTarget }),
+    }
   }
 
   private publish(): void {

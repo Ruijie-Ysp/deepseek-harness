@@ -570,6 +570,14 @@ describe('subagent ownership fence', () => {
     if (!queued.result.ok) expect(queued.result.error.code).toBe('agent-busy')
     expect(updateInbox).not.toHaveBeenCalled()
 
+    const edited = await api.sessions.editPrompt(request({
+      sessionId: originChild.id,
+      atSeq: 0,
+      content: [{ type: 'text' as const, text: 'rewritten' }],
+    }))
+    expect(edited.result.ok).toBe(false)
+    if (!edited.result.ok) expect(edited.result.error.code).toBe('agent-busy')
+
     const models = await api.sessions.models(request({ sessionId: startingChild.id }))
     expect(models.result.ok).toBe(false)
     if (!models.result.ok) expect(models.result.error.code).toBe('agent-busy')

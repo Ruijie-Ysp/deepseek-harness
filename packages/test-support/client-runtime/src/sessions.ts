@@ -107,6 +107,14 @@ export class FixtureSession implements SessionFace {
   }
 
   /**
+   * Fail-loud stub; supply `editPrompt` on the fixture's session face to exercise it.
+   * @returns never — always throws.
+   */
+  editPrompt(): never {
+    throw new Error(`test session "${this.sessionId}": editPrompt is not stubbed — supply it on the fixture's session face`)
+  }
+
+  /**
    * Fail-loud stub; supply `cancel` on the fixture's session face to exercise it.
    * @returns never — always throws.
    */

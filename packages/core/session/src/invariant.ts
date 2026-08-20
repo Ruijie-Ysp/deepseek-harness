@@ -143,6 +143,7 @@ function validateEvent(
       break
     }
     case 'user/message':
+    case 'user/edit':
       break
     case 'session/end-seed':
       // Unconstrained: an unbalanced seed legally puts it inside an open turn.

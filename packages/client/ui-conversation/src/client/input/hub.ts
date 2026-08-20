@@ -160,7 +160,10 @@ export class InputHub implements SessionInputResolver {
    * Default sink: optimistic clear + prompt. The session is always a real
    * host entity (materialized when its workspace was picked), so there is
    * exactly one path; a failed first prompt is an ordinary prompt failure
-   * (banner via promptError, draft restored only while untouched).
+   * (banner via promptError, draft restored only while untouched). While the
+   * composer is in edit mode, the same transaction becomes a message rewrite
+   * (editPrompt): the durable target rides the input shell, and images are
+   * refused because the edit protocol is text-only.
    */
   private sink(
     session: SessionFace,
@@ -169,6 +172,21 @@ export class InputHub implements SessionInputResolver {
     mode: InputSubmitMode,
     signal: AbortSignal,
   ): Promise<SubmitOutcome> {
+    const shell = this.shells.get(session.sessionId)
+    const edit = shell?.editTarget
+    if (edit != null) {
+      if (imageIds.length > 0) {
+        shell?.notify('error', this.t('edit.imagesUnsupported'))
+        return Promise.resolve({ kind: 'error' })
+      }
+      return session.editPrompt([{ type: 'text', text }], edit.atSeq, signal).then(
+        (result) => {
+          if (result.ok) return { kind: 'success' }
+          shell?.notify('error', this.t('edit.failed'))
+          return { kind: 'error' }
+        },
+      )
+    }
     if (text === '' && imageIds.length === 0) return Promise.resolve({ kind: 'success' })
     return this.conversation().sendSession(session, text, imageIds, mode, signal)
   }

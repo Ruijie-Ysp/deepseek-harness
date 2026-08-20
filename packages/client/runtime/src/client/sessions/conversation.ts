@@ -82,6 +82,17 @@ export interface UserMessageNode {
   source: unknown
 }
 
+/** A human rewrite of an earlier user message; the following turn regenerated the conversation from it. */
+export interface UserEditMessageNode {
+  kind: 'user-edit'
+  seq: number
+  /** Unix epoch ms from the source session event. */
+  time: number
+  content: readonly ContentBlock[]
+  /** Seq of the surface node this edit rewrites (the targeted message or a prior edit). */
+  replacesSeq: number
+}
+
 /** Recorded boundaries used to derive assistant latency and throughput. */
 export interface AssistantTiming {
   /** Matching step/start timestamp, or null when it is outside the current event window. */
@@ -281,6 +292,7 @@ export interface CommandNode {
 /** Finalized conversation node union (kind discriminates; seq is the React key). */
 export type ConversationNode =
   | UserMessageNode
+  | UserEditMessageNode
   | AssistantMessageNode
   | SteeringMessageNode
   | ContextMessageNode

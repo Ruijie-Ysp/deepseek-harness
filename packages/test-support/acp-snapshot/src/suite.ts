@@ -575,6 +575,7 @@ function surfaceEventMessage(record: Record<string, unknown>): Record<string, un
     case 'user/message':
       message = data
       break
+    case 'user/edit':
     case 'assistant/message':
     case 'tool/result':
       message = data.message

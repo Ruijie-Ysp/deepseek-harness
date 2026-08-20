@@ -10,7 +10,7 @@ import { commandDefinition } from '../src/client/conversation-nodes/command.ts'
 import { compactionDefinition } from '../src/client/conversation-nodes/compaction.ts'
 import { unknownFallbackDefinition } from '../src/client/conversation-nodes/fallback.ts'
 import { nextStepInboxDefinition, nextTurnInboxDefinition } from '../src/client/conversation-nodes/inbox.ts'
-import { messageDefinition } from '../src/client/conversation-nodes/message.ts'
+import { messageDefinition, userEditDefinition } from '../src/client/conversation-nodes/message.ts'
 import { retryDefinition } from '../src/client/conversation-nodes/retry.ts'
 import { toolDefinition } from '../src/client/conversation-nodes/tool.ts'
 import { turnErrorDefinition } from '../src/client/conversation-nodes/turn-error.ts'
@@ -24,6 +24,7 @@ const DEFINITIONS: readonly ConversationNodeDefinition[] = [
   nextTurnInboxDefinition,
   nextStepInboxDefinition,
   messageDefinition,
+  userEditDefinition,
   assistantDefinition,
   toolDefinition,
   commandDefinition,
@@ -588,6 +589,29 @@ describe('built-in conversation node Definitions', () => {
     expect(nodes[0]?.key).toBe(before?.key)
     expect(nodes[0]?.data).toMatchObject({ referenceLabels: ['Research notes'] })
     expect(current.legacy.nodes[0]).toMatchObject({ referenceLabels: ['Research notes'] })
+  })
+
+  it('renders a user edit as its own node carrying the rewritten content and target', () => {
+    const value = assembler([
+      at(1, 'user/message', textMessage('original-message', 'original prompt'), { surfaceOp: 'append' }),
+      at(3, 'user/edit', {
+        message: textMessage('rewritten-message', 'rewritten prompt'),
+        replacesSeq: 1,
+      }, {
+        surfaceOp: { op: 'replace', start: 1, end: 1 },
+        sourceEventSeqs: [1],
+      }),
+    ])
+
+    const current = snapshot(value)
+    const edit = node(current, 'user-edit')
+    expect(edit?.data).toMatchObject({
+      kind: 'user-edit',
+      seq: 3,
+      content: [{ type: 'text', text: 'rewritten prompt' }],
+      replacesSeq: 1,
+    })
+    expect(current.legacy.nodes.some(candidate => candidate.kind === 'user-edit')).toBe(true)
   })
 
   it('associates a claimed steering message with its following recall', () => {

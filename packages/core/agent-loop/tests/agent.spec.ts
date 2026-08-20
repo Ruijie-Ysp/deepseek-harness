@@ -164,4 +164,57 @@ describe('Agent', () => {
       expect.stringContaining('agent event "agent/status" listener threw'),
     )
   })
+
+  it('followup with a replacesSeq-marked source logs user/edit shadowing the tail', async () => {
+    const adapter = new MockAdapter([textResponse('original reply'), textResponse('regenerated reply')])
+    const ctx = await harness(adapter)
+    const agent = ctx.agentLoop.create(SessionId('edit'), { provider: 'mock', model: 'mock' })
+
+    send(agent, 'original prompt')
+    await agent.whenIdle()
+    const userSeq = agent.session.events.find(event => event.type === 'user/message')?.seq
+    const assistantSeq = agent.session.events.find(event => event.type === 'assistant/message')?.seq
+    expect(userSeq).toBeDefined()
+    expect(assistantSeq).toBeDefined()
+
+    // The host queues the rewrite with the target riding the durable source.
+    agent.followup(createUserMessage({
+      content: [{ type: 'text', text: 'rewritten prompt' }],
+      source: { kind: 'user', replacesSeq: userSeq } as never,
+    }))
+    await agent.whenIdle()
+
+    const editEvent = agent.session.events.find(event => event.type === 'user/edit')
+    expect(editEvent).toBeDefined()
+    expect(editEvent!.surfaceOp).toEqual({ op: 'replace', start: userSeq, end: assistantSeq })
+    expect(editEvent!.sourceEventSeqs).toEqual([userSeq, assistantSeq])
+    // No duplicate user/message was appended for the rewrite.
+    expect(agent.session.events.filter(event => event.type === 'user/message')).toHaveLength(1)
+    // Model history is the edited prompt followed by the regenerated reply.
+    const messages = agent.session.deriveMessages()
+    expect(messages.map(message => message.content)).toEqual([
+      [{ type: 'text', text: 'rewritten prompt' }],
+      [{ type: 'text', text: 'regenerated reply' }],
+    ])
+  })
+
+  it('fails loud when an edit target is not a current surface node', async () => {
+    const adapter = new MockAdapter([textResponse('ok')])
+    const ctx = await harness(adapter)
+    const agent = ctx.agentLoop.create(SessionId('edit-miss'), { provider: 'mock', model: 'mock' })
+
+    send(agent, 'original prompt')
+    await agent.whenIdle()
+
+    agent.followup(createUserMessage({
+      content: [{ type: 'text', text: 'rewritten' }],
+      source: { kind: 'user', replacesSeq: 9999 } as never,
+    }))
+    await agent.whenIdle()
+
+    const ended = [...agent.session.events].reverse().find(event => event.type === 'turn/end')
+    expect(ended?.type === 'turn/end' && ended.data.reason.kind).toBe('error')
+    expect(agent.session.events.some(event => event.type === 'user/edit')).toBe(false)
+    expect(agent.status).toBe('idle')
+  })
 })

@@ -964,3 +964,92 @@ describe('SurfaceManager.replaceGeneration', () => {
     expect(s.surface.replaceGeneration).toBe(1)
   })
 })
+
+describe('user/edit rewrites', () => {
+  it('is surface-eligible and projects the edited message in user role', () => {
+    expect(isSurfaceEligibleType('user/edit')).toBe(true)
+    const s = Session.create(SessionId('edit-project'))
+    s.append('turn/start', { turn: 1 })
+    const original = s.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'original' }], source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    const edit = s.append('user/edit', {
+      message: createUserMessage({
+        content: [{ type: 'text', text: 'rewritten' }], source: { kind: 'user' },
+      }),
+      replacesSeq: original.seq,
+    }, { surfaceOp: { op: 'replace', start: original.seq, end: original.seq }, sourceEventSeqs: [original.seq] })
+    s.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    const messages = s.deriveMessages()
+    expect(messages).toHaveLength(1)
+    expect(messages[0]!.content).toEqual([{ type: 'text', text: 'rewritten' }])
+    // The append-only transcript keeps the original user message.
+    expect(s.events.some(event => event.type === 'user/message')).toBe(true)
+    const editEvent = s.events[edit.seq]
+    expect(editEvent?.type === 'user/edit' && editEvent.data.replacesSeq).toBe(original.seq)
+  })
+
+  it('shadows the target and every later surface node from model history', () => {
+    const s = Session.create(SessionId('edit-tail'))
+    s.append('turn/start', { turn: 1 })
+    const original = s.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'first' }], source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    s.append('assistant/message', {
+      turn: 1, step: 1,
+      message: createMessage({
+        role: 'assistant',
+        content: [{ type: 'text', text: 'old reply' }],
+        source: { kind: 'model', ...{ provider: 'mock', model: 'mock' } },
+      }),
+    }, { surfaceOp: 'append' })
+    s.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    s.append('turn/start', { turn: 2 })
+    s.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'second' }], source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    s.append('assistant/message', {
+      turn: 2, step: 1,
+      message: createMessage({
+        role: 'assistant',
+        content: [{ type: 'text', text: 'second reply' }],
+        source: { kind: 'model', ...{ provider: 'mock', model: 'mock' } },
+      }),
+    }, { surfaceOp: 'append' })
+    s.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
+    const nodes = s.surface.nodes
+    expect(nodes).toHaveLength(4)
+    s.append('user/edit', {
+      message: createUserMessage({
+        content: [{ type: 'text', text: 'rewritten' }], source: { kind: 'user' },
+      }),
+      replacesSeq: original.seq,
+    }, {
+      surfaceOp: { op: 'replace', start: original.seq, end: nodes[nodes.length - 1]! },
+      sourceEventSeqs: [...nodes],
+    })
+    const messages = s.deriveMessages()
+    expect(messages).toHaveLength(1)
+    expect(messages[0]!.content).toEqual([{ type: 'text', text: 'rewritten' }])
+  })
+
+  it('rejects a replace whose sourceEventSeqs omit a shadowed node', () => {
+    const s = Session.create(SessionId('edit-provenance'))
+    const original = s.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'one' }], source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    s.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'two' }], source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    const nodes = s.surface.nodes
+    expect(() => s.append('user/edit', {
+      message: createUserMessage({
+        content: [{ type: 'text', text: 'rewritten' }], source: { kind: 'user' },
+      }),
+      replacesSeq: original.seq,
+    }, {
+      surfaceOp: { op: 'replace', start: original.seq, end: nodes[nodes.length - 1]! },
+      sourceEventSeqs: [original.seq],
+    })).toThrow(/sourceEventSeqs must include every shadowed surface node/)
+  })
+})

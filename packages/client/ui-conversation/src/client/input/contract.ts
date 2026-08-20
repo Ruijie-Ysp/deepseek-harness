@@ -81,6 +81,16 @@ export interface InputActions {
   pruneImages(ids: readonly DraftAttachmentId[]): void
   /** Enter submission (adjudication / claim transaction / default sink inside). */
   submit(): void
+  /**
+   * Enter edit mode for one durable user message: the draft adopts the
+   * message text and the next submit rewrites the message instead of sending
+   * a new prompt. Resubmitting clears edit mode.
+   * @param atSeq - seq of the surface node projecting the edited message.
+   * @param text - the message text loaded into the draft.
+   */
+  beginEdit(atSeq: number, text: string): void
+  /** Leave edit mode, keeping the current draft. */
+  cancelEdit(): void
 }
 
 /** One surfaced notice (command results, adjudication failures). seq keys re-render of repeats. */
@@ -225,6 +235,8 @@ export interface InputState {
   readonly paste?: PasteAttemptState
   /** Read-only transient inbox projection (`session/queue`, including pending steering). */
   readonly queue: readonly QueuedMessage[]
+  /** Edit-mode target: present while the composer rewrites one durable user message. */
+  readonly edit?: { readonly atSeq: number }
 }
 
 /**

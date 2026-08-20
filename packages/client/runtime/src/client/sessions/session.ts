@@ -295,6 +295,31 @@ export class Session implements SessionFace {
   }
 
   /**
+   * Rewrite one durable user message (contract session.editPrompt 1:1). Text
+   * content only.
+   * @param content - the rewritten text blocks.
+   * @param atSeq - seq of the surface node projecting the edited message.
+   * @param signal - optional cancellation for the Host admission.
+   * @returns acceptance, or the business/transport error.
+   */
+  async editPrompt(
+    content: { type: 'text'; text: string }[],
+    atSeq: number,
+    signal?: AbortSignal,
+  ): Promise<RpcResult<{ accepted: true }>> {
+    try {
+      return (await this.api.sessions.editPrompt({
+        sessionId: this.sessionId,
+        atSeq,
+        content,
+        clientTimeZone: resolvedClientTimeZone(),
+      }, signal)).result
+    } catch (error) {
+      return transportError(error)
+    }
+  }
+
+  /**
    * Stop the active turn while the Host preserves pending inbox work; failures
    * land in promptError (same error-strip display slot). A continuable
    * subagent address routes through `subagent.interrupt`, whose durable

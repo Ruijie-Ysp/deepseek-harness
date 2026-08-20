@@ -89,6 +89,9 @@ import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-a
 // Side-effect type import: resolves the `approval/request` waterfall and
 // `ctx.get('approval')` without a value dependency on the seam (optional composition).
 import type {} from '@deepseek-ai/dsh-user-approval'
+// Side-effect type import: resolves `ctx.get('ocrPreprocess')` without a value
+// dependency on the seam (optional composition).
+import type {} from '@deepseek-ai/dsh-ocr-preprocess'
 import { approvalResponsePayloadSchema } from './api/approvals.schema.ts'
 import { imageLimitsProjectionSchema, sessionListMetadataProjectionSchema } from './api/sessions.schema.ts'
 import { questionResponsePayloadSchema } from './api/questions.schema.ts'
@@ -2210,7 +2213,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             })
             const pendingImage = [...found.agent.inbox.nextTurn, ...found.agent.inbox.nextStep]
               .some(message => contentHasImage(message.content))
-            if (pendingImage || messagesHaveImage(found.agent.session.deriveMessages())) {
+            // OCR preprocessing converts image messages to text at pre-step, so
+            // a text-only model can serve a session whose pending images it
+            // will never see raw.
+            const ocrHandlesImages = ctx.get('ocrPreprocess')?.handlesImages() === true
+            if ((pendingImage || messagesHaveImage(found.agent.session.deriveMessages())) && !ocrHandlesImages) {
               const info = await ctx.llm.resolveModelInfo(resolved.provider, resolved.model)
               if (info.inputModalities !== undefined && !info.inputModalities.includes('image')) {
                 return err(request, {
@@ -2398,7 +2405,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const hasImage = content.some(part => part.type === 'image')
         const admit = async (): Promise<RpcResponse<{ accepted: true }>> => {
           try {
-            if (hasImage) {
+            // OCR preprocessing converts the admitted image to text at
+            // pre-step, so a text-only current model can accept it.
+            const ocrHandlesImages = ctx.get('ocrPreprocess')?.handlesImages() === true
+            if (hasImage && !ocrHandlesImages) {
               const current = selectionFor(agent).current
               const modelInfo = await ctx.llm.resolveModelInfo(current.provider, current.model)
               if (modelInfo.inputModalities !== undefined && !modelInfo.inputModalities.includes('image')) {
@@ -2430,6 +2440,66 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           return ok(request, { accepted: true as const })
         }
         return hasImage ? serializeImageAdmission(agent, admit) : admit()
+      },
+
+      async editPrompt(request) {
+        const { sessionId, atSeq, content, clientTimeZone } = request.payload
+        const canonicalTimeZone = clientTimeZone === undefined
+          ? undefined
+          : canonicalClientTimeZone(clientTimeZone)
+        if (clientTimeZone !== undefined && canonicalTimeZone === undefined) {
+          return err(request, {
+            code: 'invalid-time-zone',
+            message: 'clientTimeZone must be UTC or a valid IANA Area/Location name',
+            details: { value: clientTimeZone },
+          })
+        }
+        const resolved = await turnAgentFor<{ accepted: true }>(request, sessionId)
+        if ('refused' in resolved) return resolved.refused
+        const agent = resolved.agent
+        if (hasSubagentOwner(agent.session, agent)) {
+          return err(request, subagentOwnershipError(sessionId))
+        }
+        const nodes = agent.session.surface.nodes
+        if (!nodes.includes(atSeq)) {
+          return err(request, {
+            code: 'edit-target-invalid',
+            message: `seq ${atSeq} is not a current message on the session surface`,
+            details: { atSeq },
+          })
+        }
+        const target = agent.session.events[atSeq]
+        const targetable = target !== undefined && (
+          (target.type === 'user/message' && target.data.source.kind === 'user')
+          || target.type === 'user/edit'
+        )
+        if (!targetable) {
+          return err(request, {
+            code: 'edit-target-invalid',
+            message: `seq ${atSeq} does not project a human user message`,
+            details: { atSeq },
+          })
+        }
+        // The rewrite target rides the durable inbox splice (source.replacesSeq),
+        // so the loop logs `user/edit` when its turn claims the message. The
+        // target's non-text blocks (images) are preserved verbatim and reused:
+        // editing rewrites the text only, and the edit protocol admits no new
+        // image content.
+        const targetBlocks: readonly ContentBlock[] = target.type === 'user/message'
+          ? target.data.content
+          : target.data.message.content
+        const preserved = targetBlocks.filter(block => block.type !== 'text')
+        const message = createUserMessage({
+          content: [...content, ...preserved],
+          source: {
+            kind: 'user',
+            rpcId: request.rpcId,
+            ...(canonicalTimeZone === undefined ? {} : { clientTimeZone: canonicalTimeZone }),
+            replacesSeq: atSeq,
+          },
+        })
+        agent.followup(message)
+        return ok(request, { accepted: true as const })
       },
 
       async attachment(request) {

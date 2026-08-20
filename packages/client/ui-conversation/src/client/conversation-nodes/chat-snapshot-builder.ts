@@ -254,6 +254,7 @@ function legacyContribution(raw: ChatConversationViewNode): LegacyContribution {
   if (raw.visibility !== 'visible' && node.kind !== 'assistant-step') return EMPTY_CONTRIBUTION
   switch (node.kind) {
     case 'user':
+    case 'user-edit':
     case 'steering':
     case 'context':
     case 'command':

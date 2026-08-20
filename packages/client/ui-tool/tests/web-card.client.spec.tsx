@@ -233,7 +233,7 @@ describe('DetailsPanel web Output section', () => {
           addImages: () => true,
           removeImage: () => {},
           pruneImages: () => {},
-          submit: () => {},
+          submit: () => {}, beginEdit: () => {}, cancelEdit: () => {},
         }}
         useProjection={(() => undefined)}
         useStore={bindSnapshotSelector(chat)}

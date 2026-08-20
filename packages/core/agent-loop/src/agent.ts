@@ -27,7 +27,7 @@ import {
 } from '@deepseek-ai/dsh-llm'
 import type { Scope } from '@deepseek-ai/dsh-scope'
 import { createScope } from '@deepseek-ai/dsh-scope'
-import type { EpochHeader, RequestContext, Session, SessionId, TurnEndReason, UserMessage } from '@deepseek-ai/dsh-session'
+import type { EpochHeader, RequestContext, Session, SessionId, SurfaceIntent, TurnEndReason, UserMessage } from '@deepseek-ai/dsh-session'
 import { canonicalHeader, headerEquals } from '@deepseek-ai/dsh-session'
 import { joinContextSections, renderContextSections, renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import type { PromptAssembly } from '@deepseek-ai/dsh-system-prompt'
@@ -58,6 +58,48 @@ function requestProposal(header: EpochHeader): LlmCallConfig {
   if (header.adapterDefaults.reasoningEffort === true) delete proposal.reasoningEffort
   if (header.adapterDefaults.maxTokens === true) delete proposal.maxTokens
   return proposal
+}
+
+/**
+ * The durable rewrite target carried by an edit-claimed user message, or
+ * undefined for an ordinary prompt. The host sets the field on the message
+ * source before inserting it into the inbox, so the splice is the durable
+ * record of the pending edit; the loop turns it into a `user/edit` append.
+ * @param message - the claimed inbox message.
+ * @returns the surface seq the edit rewrites, or undefined for ordinary input.
+ */
+function editTargetOf(message: UserMessage): number | undefined {
+  const replacesSeq = (message.source as { replacesSeq?: unknown }).replacesSeq
+  return typeof replacesSeq === 'number' && Number.isSafeInteger(replacesSeq) && replacesSeq >= 0
+    ? replacesSeq
+    : undefined
+}
+
+/**
+ * Build the `user/edit` surface intent shadowing the targeted surface node and
+ * every node after it — the tail the rewrite discards from model history.
+ * @param nodes - the live surface node seqs at append time.
+ * @param replacesSeq - the targeted surface node.
+ * @returns the replace intent citing every shadowed node.
+ * @throws when the target is not a current surface node (the host validates
+ * before the message is queued; this guards a racing surface rewrite).
+ */
+function surfaceReplaceIntent(
+  nodes: readonly number[],
+  replacesSeq: number,
+): SurfaceIntent {
+  const startIdx = nodes.indexOf(replacesSeq)
+  if (startIdx === -1) {
+    throw new Error(`user/edit targets surface seq ${replacesSeq} which is no longer a surface node`)
+  }
+  const shadowed = nodes.slice(startIdx)
+  const tail = shadowed[shadowed.length - 1]
+  /* v8 ignore next -- a valid startIdx guarantees the slice is non-empty. */
+  if (tail === undefined) throw new Error(`user/edit targets seq ${replacesSeq} but the surface is empty`)
+  return {
+    surfaceOp: { op: 'replace', start: replacesSeq, end: tail },
+    sourceEventSeqs: shadowed,
+  }
 }
 
 /** Drives one session through turn and step boundaries. */
@@ -280,7 +322,19 @@ export class ReactLoopAgent implements Agent {
         phase.step = step
         try {
           for (const message of decision.messages) {
-            this.session.append('user/message', message, { surfaceOp: 'append' })
+            // An edit-claimed message rewrites a durable surface node instead
+            // of appending: the loop logs `user/edit` with a replace intent
+            // shadowing the target and the whole tail it discards.
+            const replacesSeq = editTargetOf(message)
+            if (replacesSeq === undefined) {
+              this.session.append('user/message', message, { surfaceOp: 'append' })
+            } else {
+              this.session.append(
+                'user/edit',
+                { message, replacesSeq },
+                surfaceReplaceIntent(this.session.surface.nodes, replacesSeq),
+              )
+            }
           }
           // max-tokens is sticky: once any step hits the ceiling, later steps
           // that complete normally must not downgrade the turn outcome.

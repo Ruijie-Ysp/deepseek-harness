@@ -1,0 +1,8 @@
+{
+  "steps": [
+    {
+      "op": "prompt",
+      "text": "Reply with exactly the words ORIGINAL REPLY. Do not use any tool."
+    }
+  ]
+}

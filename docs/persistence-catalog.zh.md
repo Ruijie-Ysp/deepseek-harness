@@ -24,6 +24,7 @@ export type SessionEventType = keyof SessionEventMap
  */
 export type SurfaceEventType =
   | 'user/message'
+  | 'user/edit'
   | 'assistant/message'
   | 'tool/result'
 
@@ -977,6 +978,23 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 来源：[`packages/core/session/src/types.ts:243`](../packages/core/session/src/types.ts)
 
 ### `user/*`
+
+<a id="useredit--surface"></a>
+
+#### `user/edit` — surface
+
+```ts persistence-catalog
+/**
+ * A human rewrite of an earlier user message: the loop logs this event with a
+ * `replace` surfaceOp shadowing the targeted surface node and everything
+ * after it, then runs one new turn against `message`. The appended-only
+ * transcript keeps the original; `deriveMessages` projects the edited
+ * `message` in user role at the replaced position.
+ */
+'user/edit': UserEditEvent
+```
+
+来源：[`packages/core/session/src/types.ts:286`](../packages/core/session/src/types.ts)
 
 <a id="usermessage--surface"></a>
 

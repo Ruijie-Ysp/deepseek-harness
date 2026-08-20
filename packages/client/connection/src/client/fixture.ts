@@ -2564,6 +2564,41 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         )
         return ok(request, { accepted: true as const })
       },
+      editPrompt: (request) => {
+        const { sessionId: id, atSeq, content } = request.payload
+        const summary = summaryOf(id)
+        if (summary === undefined) {
+          return err(request, { code: 'session-not-found', message: `no session ${id}`, details: { sessionId: id } })
+        }
+        const log = logOf(id)
+        const nodes = foldSurface(log).nodes
+        if (!nodes.includes(atSeq)) {
+          return err(request, {
+            code: 'edit-target-invalid',
+            message: `seq ${atSeq} is not a current message on the session surface`,
+            details: { atSeq },
+          })
+        }
+        summary.updatedAt = Date.now()
+        const startIdx = nodes.indexOf(atSeq)
+        const shadowed = nodes.slice(startIdx)
+        const tail = shadowed[shadowed.length - 1]
+        /* v8 ignore next -- nodes.includes(atSeq) above guarantees a non-empty surface. */
+        if (tail === undefined) throw new Error('fixture: user/edit surface is empty')
+        const userText = content.map(block => block.text).join('')
+        const turn = nextTurn.get(id) ?? 0
+        nextTurn.set(id, turn + 1)
+        setRunning(id, true)
+        append(id, { type: 'turn/start', data: { turn } })
+        append(id, {
+          type: 'user/edit',
+          surfaceOp: { op: 'replace', start: atSeq, end: tail },
+          sourceEventSeqs: shadowed,
+          data: { message: userMessage([{ type: 'text', text: userText }]), replacesSeq: atSeq },
+        })
+        startReply(id, turn, `回声（已编辑）：${userText}。这是 fixture 对编辑后消息的流式回复。`)
+        return ok(request, { accepted: true as const })
+      },
       attachment: (request) => {
         const stored = attachments.get(String(request.payload.attachmentId))
         if (stored === undefined) {
@@ -3185,6 +3220,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'session.fork': return this.api.sessions.fork(request)
       case 'session.prompt': return this.api.sessions.prompt(request)
       case 'session.attachment': return this.api.sessions.attachment(request)
+      case 'session.editPrompt': return this.api.sessions.editPrompt(request)
       case 'session.updateQueue': return this.api.sessions.updateQueue(request)
       case 'session.cancel': return this.api.sessions.cancel(request)
       case 'subagent.list': return this.api.subagents.list(request)

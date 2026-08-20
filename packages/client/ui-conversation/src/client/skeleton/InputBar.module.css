@@ -38,6 +38,31 @@
   line-height: 18px;
 }
 
+.editBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 0 12px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.editBannerCancel {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--dsw-alias-accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.editBannerCancel:hover {
+  text-decoration: underline;
+}
+
 .card {
   box-sizing: border-box;
   position: relative; /* overlay anchor positioning context */

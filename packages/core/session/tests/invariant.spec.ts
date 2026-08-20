@@ -67,6 +67,24 @@ describe('session-log invariants', () => {
     }).not.toThrow()
   })
 
+  it('accepts a user edit appended inside a turn', async () => {
+    const { ctx } = await setup()
+    const session = ctx.sessions.create()
+    expect(() => {
+      session.append('turn/start', { turn: 1 })
+      session.append('user/message', createUserMessage({
+        content: [{ type: 'text', text: 'original' }], source: { kind: 'user' },
+      }), { surfaceOp: 'append' })
+      session.append('user/edit', {
+        message: createUserMessage({
+          content: [{ type: 'text', text: 'rewritten' }], source: { kind: 'user' },
+        }),
+        replacesSeq: 1,
+      }, { surfaceOp: { op: 'replace', start: 1, end: 1 }, sourceEventSeqs: [1] })
+      session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    }).not.toThrow()
+  })
+
   it('does not advance committed trace state when a later dispatch listener vetoes', async () => {
     const { ctx } = await setup()
     const session = ctx.sessions.create(SessionId('dispatch-veto-rollback'))

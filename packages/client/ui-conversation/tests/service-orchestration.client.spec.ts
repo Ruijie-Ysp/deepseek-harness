@@ -18,10 +18,11 @@ async function bench(readAttachment?: SessionFace['readAttachment']) {
   const prompt = vi.fn(() => Promise.resolve({ ok: true as const, value: { accepted: true as const } }))
   const updateQueue = vi.fn(() => Promise.resolve({ ok: true as const, value: { accepted: true as const } }))
   const cancel = vi.fn(() => Promise.resolve({ ok: true as const, value: { accepted: true as const } }))
+  const editPrompt = vi.fn(() => Promise.resolve({ ok: true as const, value: { accepted: true as const } }))
   const loadOlder = vi.fn(() => Promise.resolve())
   await runtime.sessions.add({
     id: 's1',
-    session: { prompt, updateQueue, cancel, loadOlder, ...(readAttachment === undefined ? {} : { readAttachment }) },
+    session: { prompt, updateQueue, cancel, editPrompt, loadOlder, ...(readAttachment === undefined ? {} : { readAttachment }) },
   })
   // config.input is required (the apply shares its hub with the inject
   // factories); the bench passes its own instance explicitly.
@@ -34,7 +35,7 @@ async function bench(readAttachment?: SessionFace['readAttachment']) {
   const root = runtime.ctx.get('conversation') as ConversationController
   const scoped = runtime.sessions.scope('s1')!.get('conversation') as ConversationController
   const shell = hub.shellFor(runtime.sessions.binding('s1')!)
-  return { runtime, fiber, root, scoped, hub, shell, prompt, updateQueue, cancel, loadOlder }
+  return { runtime, fiber, root, scoped, hub, shell, prompt, updateQueue, cancel, editPrompt, loadOlder }
 }
 
 describe('ConversationController', () => {
@@ -220,6 +221,51 @@ describe('InputHub queue steering (empty-draft accelerated Enter)', () => {
     const b = await bench()
     b.shell.steerQueue()
     expect(b.updateQueue).not.toHaveBeenCalled()
+    await b.runtime.dispose()
+  })
+
+  it('routes an edit-mode submit through editPrompt and clears edit mode on success', async () => {
+    const b = await bench()
+    b.shell.beginEdit(5, 'rewritten prompt')
+    expect(b.shell.snapshot.edit).toEqual({ atSeq: 5 })
+    b.shell.submit()
+    await vi.waitFor(() => {
+      expect(b.editPrompt).toHaveBeenCalledTimes(1)
+    })
+    expect(b.editPrompt).toHaveBeenCalledWith(
+      [{ type: 'text', text: 'rewritten prompt' }],
+      5,
+      expect.any(AbortSignal),
+    )
+    expect(b.prompt).not.toHaveBeenCalled()
+    await vi.waitFor(() => { expect(b.shell.snapshot.edit).toBeUndefined() })
+    await b.runtime.dispose()
+  })
+
+  it('refuses images in edit mode with a notice and keeps the draft', async () => {
+    const b = await bench()
+    b.shell.beginEdit(5, 'rewritten prompt')
+    b.shell.addImages(['img-1'] as never)
+    b.shell.submit()
+    await vi.waitFor(() => {
+      expect(b.shell.notices.getSnapshot()).toEqual(
+        expect.objectContaining({ level: 'error', text: '编辑历史消息不支持添加图片' }),
+      )
+    })
+    expect(b.editPrompt).not.toHaveBeenCalled()
+    expect(b.shell.snapshot.edit).toEqual({ atSeq: 5 })
+    await b.runtime.dispose()
+  })
+
+  it('cancelEdit leaves edit mode while keeping the draft', async () => {
+    const b = await bench()
+    b.shell.beginEdit(5, 'rewritten prompt')
+    b.shell.cancelEdit()
+    expect(b.shell.snapshot.edit).toBeUndefined()
+    expect(b.shell.snapshot.draft).toBe('rewritten prompt')
+    b.shell.submit()
+    await vi.waitFor(() => { expect(b.prompt).toHaveBeenCalledTimes(1) })
+    expect(b.editPrompt).not.toHaveBeenCalled()
     await b.runtime.dispose()
   })
 })

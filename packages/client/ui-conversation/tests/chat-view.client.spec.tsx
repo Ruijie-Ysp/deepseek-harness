@@ -162,6 +162,8 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     read: () => savedScroll,
   }
   const forkAt = vi.fn()
+  const beginEdit = vi.fn()
+  const cancelEdit = vi.fn()
   // Selection rides the REAL chat store (same construction path as
   // production; the view reads it through the PropsStore useStore share).
   const chat = createChatStore().create()
@@ -275,6 +277,8 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
       removeImage: () => {},
       pruneImages: () => {},
       submit: () => {},
+      beginEdit,
+      cancelEdit,
     },
     useStore: bindSnapshotSelector(chat),
     actions: chat.actions,
@@ -295,7 +299,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   const setSelection = (next: SelectionTarget | null): void => { chat.actions.select(next) }
   return {
     set, ChatView, props, openDetails, openFile, loadOlder, inspectCall,
-    chatScroll, forkAt, setSelection, toolOwners,
+    chatScroll, forkAt, beginEdit, cancelEdit, setSelection, toolOwners,
   }
 }
 
@@ -626,6 +630,48 @@ describe('ChatView', () => {
     const branchButtons = view.getAllByRole('button', { name: '在新对话中分支' })
     expect(branchButtons).toHaveLength(2)
     expect(branchButtons.map(button => button.getAttribute('aria-disabled'))).toEqual([null, null])
+  })
+
+  it('hands a text-only user bubble edit off to the input actions', () => {
+    const h = makeHarness({
+      nodes: [user(1, 'hello world'), assistant(2, 'reply')],
+      turnEnds: new Map([[1, 2]]),
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    const editButtons = view.getAllByRole('button', { name: '编辑消息' })
+    expect(editButtons).toHaveLength(1)
+    fireEvent.click(editButtons[0]!)
+    expect(h.beginEdit).toHaveBeenCalledWith(1, 'hello world')
+  })
+
+  it('offers message edit on a text-bearing image bubble but not image-only or steering', () => {
+    const imageUser: UserMessageNode = {
+      kind: 'user',
+      seq: 1,
+      time: 1_000,
+      content: [
+        { type: 'text', text: 'caption' },
+        { type: 'image', attachment: { attachmentId: 'a' as never, mediaType: 'image/png', bytes: 1, width: 1, height: 1 } },
+      ] as never,
+      source: null,
+    }
+    const imageOnly: UserMessageNode = {
+      kind: 'user',
+      seq: 2,
+      time: 2_000,
+      content: [
+        { type: 'image', attachment: { attachmentId: 'b' as never, mediaType: 'image/png', bytes: 1, width: 1, height: 1 } },
+      ] as never,
+      source: null,
+    }
+    const h = makeHarness({
+      nodes: [imageUser, imageOnly, user(4, 'plain'), assistant(5, 'reply')],
+      turnEnds: new Map([[1, 5]]),
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    // The text-bearing image bubble and the plain bubble are editable; the
+    // image-only bubble has nothing to rewrite.
+    expect(view.queryAllByRole('button', { name: '编辑消息' })).toHaveLength(2)
   })
 
   it('withholds assistant IconActions while the turn is still running', () => {

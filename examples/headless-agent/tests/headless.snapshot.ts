@@ -50,6 +50,11 @@ const settlementConfigPath = fileURLToPath(new URL('../subagent-settlement.cordi
 const teamConfigPath = fileURLToPath(new URL('../team.cordis.snapshot.yml', import.meta.url))
 const startupFailureConfigPath = fileURLToPath(new URL('./fixtures/startup-activation-error/cordis.yml', import.meta.url))
 const startupFailureExpected = join(snapshotsDir, 'startup-activation-error', 'stderr.expected.txt')
+const userEditScenarioDir = join(snapshotsDir, 'user-edit')
+const userEditSessionFixture = join(userEditScenarioDir, 'session.jsonl')
+const userEditStreamExpected = join(userEditScenarioDir, 'stream-json.expected.jsonl')
+const userEditConfigPath = fileURLToPath(new URL('../edit.cordis.snapshot.yml', import.meta.url))
+const userEditBinScript = fileURLToPath(new URL('./fixtures/headless-edit-driver.ts', import.meta.url))
 const binScript = fileURLToPath(new URL('./fixtures/headless-driver.ts', import.meta.url))
 const dshBinScript = fileURLToPath(new URL('../../../apps/cli/src/bin.ts', import.meta.url))
 const tsconfigPath = fileURLToPath(new URL('../../../tsconfig.json', import.meta.url))
@@ -398,6 +403,67 @@ describe('headless stream-json snapshots', () => {
     const normalized = normalizeHeadlessStream(result.stdout, runCwd)
     if (refreshing) await writeFile(compactionStreamExpected, normalized)
     expect(normalized).toBe(await readFile(compactionStreamExpected, 'utf8'))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('rewrites a settled user message and regenerates from it', async () => {
+    const prompt = await scenarioPrompt(userEditScenarioDir, 'user-edit')
+    let expectedSession = await readFile(userEditSessionFixture, 'utf8')
+    let runCwd = ''
+    const result = await runLoaderSmoke({
+      label: 'user message edit headless stream-json snapshot',
+      tempDirPrefix: 'headless-snapshot-user-edit-',
+      binScript: userEditBinScript,
+      libBinScript: userEditBinScript,
+      configPath: userEditConfigPath,
+      binArgs: [userEditConfigPath, prompt],
+      tsconfigPath,
+      env: {
+        DSH_SNAPSHOT: 'replay',
+        DSH_SNAPSHOT_FILE: userEditSessionFixture,
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+      },
+      prepare: (cwd) => { runCwd = cwd },
+      inspect: async (cwd) => {
+        const logs = await persistedLogs(cwd)
+        expect(logs).toHaveLength(1)
+        const actual = logs[0]
+        if (actual === undefined) throw new Error('user-edit snapshot did not persist its session')
+        const records = parseJsonl(actual.content)
+        // The edit turn logs exactly one user/edit event shadowing the first user message.
+        const edits = records.filter(record => record.type === 'user/edit')
+        expect(edits).toHaveLength(1)
+        const edit = edits[0]
+        expect(edit?.data).toMatchObject({ replacesSeq: expect.any(Number) })
+        expect((edit?.surfaceOp as JsonObject | undefined)?.op).toBe('replace')
+        // One original user message stays in the durable transcript; the edit is distinct.
+        expect(records.filter(record => record.type === 'user/message')).toHaveLength(1)
+        // The regenerated reply is the final assistant output.
+        const final = [...records].reverse().find(record => record.type === 'assistant/message')
+        expect(JSON.stringify(final)).toContain('EDITED REPLY')
+
+        const actualContext = contextFromLogs([actual.content])
+        if (refreshing) {
+          const harvested: HarvestedLog = {
+            id: String(actual.header.id),
+            createdAt: Number(actual.header.createdAt),
+            content: actual.content,
+          }
+          const replacements = refreshFixtureReplacements([harvested], [expectedSession])
+          expectedSession = tokenizeSessionFixtureCwd(
+            stabilizeRefreshLog(actual.content, expectedSession, replacements, actualContext),
+          )
+          await writeFile(userEditSessionFixture, expectedSession)
+        }
+        const expectedContext = contextFromLogs([expectedSession])
+        expect(scrubRequestHeaders(normalizeSessionLog(actual.content, actualContext)))
+          .toBe(scrubRequestHeaders(normalizeSessionLog(expectedSession, expectedContext)))
+      },
+    })
+
+    expect(result.stderr).toBe('')
+    const normalized = normalizeHeadlessStream(result.stdout, runCwd)
+    if (refreshing) await writeFile(userEditStreamExpected, normalized)
+    expect(normalized).toBe(await readFile(userEditStreamExpected, 'utf8'))
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
   it('logs actionable missing-credential guidance through the one-shot app', async () => {

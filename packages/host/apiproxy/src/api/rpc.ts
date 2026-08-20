@@ -82,6 +82,12 @@ export interface RpcErrorDetailsMap {
   'model-discovery-failed': { settingsNs: string; baseURL?: string }
   'title-invalid': { sessionId: SessionId }
   'fork-unavailable': { sessionId: SessionId }
+  /**
+   * An edit prompt named a seq that is not a current surface node projecting a
+   * human user message (no such message, a non-user surface node, or a seq the
+   * surface no longer carries). The message names the seq.
+   */
+  'edit-target-invalid': { atSeq: number }
   'subagent-parent-unavailable': { parentSessionId: SessionId }
   'subagent-not-found': { parentSessionId: SessionId; childSessionId: SessionId }
   'subagent-catalog-diagnostic': {

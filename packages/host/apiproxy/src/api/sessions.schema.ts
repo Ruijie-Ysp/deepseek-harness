@@ -302,6 +302,19 @@ export const sessionPromptValueSchema = z.object({
   }).optional(),
 }) satisfies z.ZodType<Wire<ResponseValue<'session.prompt'>>>
 
+/** session.editPrompt request payload: rewrite one durable user message (text only). */
+export const sessionEditPromptRequestSchema = z.object({
+  sessionId: sessionIdSchema,
+  atSeq: z.number().int().nonnegative(),
+  content: z.array(z.object({ type: z.literal('text'), text: z.string() })),
+  clientTimeZone: z.string().optional(),
+}) as unknown as z.ZodType<RequestPayload<'session.editPrompt'>>
+
+/** session.editPrompt response value. */
+export const sessionEditPromptValueSchema = z.object({
+  accepted: z.literal(true),
+}) satisfies z.ZodType<Wire<ResponseValue<'session.editPrompt'>>>
+
 /** Opaque attachment id after string-shape validation. */
 export const attachmentIdSchema = z.string().min(1) as unknown as z.ZodType<AttachmentIdType>
 

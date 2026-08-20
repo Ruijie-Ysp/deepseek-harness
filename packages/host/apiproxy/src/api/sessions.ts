@@ -51,8 +51,12 @@ declare module '@deepseek-ai/dsh-llm' {
      * echoed provisional message with the event stream). kind stays `'user'` — the model face
      * carries no transport vocabulary; rpcId and the optional Host-validated browser zone are
      * durable JSON fields passed back to the client with the event.
+     *
+     * `replacesSeq` is present only on an edit-submitted message: the durable
+     * inbox splice carries the rewrite target so the loop appends `user/edit`
+     * (replacing that surface node and its tail) instead of `user/message`.
      */
-    'user-rpc': { kind: 'user'; rpcId: RpcId; clientTimeZone?: string }
+    'user-rpc': { kind: 'user'; rpcId: RpcId; clientTimeZone?: string; replacesSeq?: number }
   }
 }
 
@@ -355,6 +359,25 @@ export interface SessionsApi {
   /** Reads one durable image after proving that this session's log references its id. */
   attachment(request: RpcRequest<{ sessionId: SessionId; attachmentId: AttachmentIdType }>):
   Promise<RpcResponse<{ attachment: ImageAttachmentRef; data: string }>>
+
+  /**
+   * Rewrites one durable user message and regenerates the conversation from it.
+   * `atSeq` names a current surface node projecting a human user message (an
+   * append-origin `user/message` or a prior `user/edit`); anything after it is
+   * discarded from model history. The edited text is queued for the next turn,
+   * the loop durably logs `user/edit` with a replace surfaceOp, and one new
+   * turn runs against the rewritten input. Text content only: the target's
+   * non-text blocks (images) are preserved verbatim and reused, so a rewrite
+   * changes prose without dropping already-durable attachments; session-backed
+   * subagents reject with `agent-busy`.
+   */
+  editPrompt(request: RpcRequest<{
+    sessionId: SessionId
+    atSeq: number
+    content: { type: 'text'; text: string }[]
+    clientTimeZone?: string
+  }>):
+  Promise<RpcResponse<{ accepted: true }>>
 
   /**
    * Edits, removes, or strictly steers one pending queued occurrence on an ordinary session.

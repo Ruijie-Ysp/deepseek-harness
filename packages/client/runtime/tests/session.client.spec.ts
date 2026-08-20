@@ -696,8 +696,24 @@ describe('remaining branches', () => {
     }
   })
 
-  it('subscribe delivers snapshot-change notifications and unsubscribes', async () => {
+  it('editPrompt passes the rewrite target through and folds transport throws', async () => {
     const { api, session } = makeSession()
+    const zoned = new Intl.DateTimeFormat().resolvedOptions().timeZone
+    const result = await session.editPrompt([{ type: 'text', text: 'rewritten' }], 7)
+    expect(result).toEqual({ ok: true, value: { accepted: true } })
+    expect(api.callsOf('session.editPrompt')).toEqual([{
+      sessionId: SID,
+      atSeq: 7,
+      content: [{ type: 'text', text: 'rewritten' }],
+      clientTimeZone: zoned,
+    }])
+    api.onEditPrompt = () => Promise.reject(new Error('edit wire down'))
+    const failed = await session.editPrompt([{ type: 'text', text: 'rewritten' }], 7)
+    expect(failed.ok).toBe(false)
+    if (!failed.ok) expect(failed.error.message).toBe('edit wire down')
+  })
+
+  it('subscribe delivers snapshot-change notifications and unsubscribes', async () => {    const { api, session } = makeSession()
     api.onHistory = () => histResponse(plainTurn(0, 0, 'a', 'b'))
     let notified = 0
     const unsubscribe = session.subscribe(() => { notified++ })

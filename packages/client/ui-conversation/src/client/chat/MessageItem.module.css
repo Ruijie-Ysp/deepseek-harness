@@ -28,6 +28,15 @@
   color: var(--dsw-alias-label-primary);
 }
 
+.editedBadge {
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 24px;
+  vertical-align: 2px;
+}
+
 .referenceSummary {
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
