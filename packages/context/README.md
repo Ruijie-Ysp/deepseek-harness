@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Product plugins that add model-visible request context without defining a tool. `agent-instructions` is included by the default `dsh-agent-spine-demo` bundle and can be disabled through bundle config; `time-context`, `tmux-context`, `session-reference`, `file-reference`, `file-reference-local`, and `ocr-preprocess` are opt-in.
+Product plugins that add model-visible request context without defining a tool. `agent-instructions` is included by the default `dsh-agent-spine-demo` bundle and can be disabled through bundle config; `time-context`, `tmux-context`, `session-reference`, `file-reference`, and `file-reference-local` are opt-in.
 
 | Package | Role | ctx key |
 |---|---|---|
@@ -11,7 +11,6 @@ Product plugins that add model-visible request context without defining a tool. 
 | [`file-reference-local/`](file-reference-local/README.md) | Local-filesystem file-reference provider | — |
 | [`time-context/`](time-context/README.md) | Current-time and elapsed-time context | — |
 | [`tmux-context/`](tmux-context/README.md) | tmux location context | — |
-| [`ocr-preprocess/`](ocr-preprocess/README.md) | OCR preprocessing of image messages for text-only models | `ctx.ocrPreprocess` |
 | [`agent-instructions/`](agent-instructions/README.md) | Workspace-instruction context | — |
 
 Session references are documented in [docs/subsystems/session-reference.md](../../docs/subsystems/session-reference.md); the [`agent-instructions` decision record](../../.agents/notes/implemented/feature/2026-06-24-workspace-context.md) owns its per-agent/session isolation and lifecycle split.

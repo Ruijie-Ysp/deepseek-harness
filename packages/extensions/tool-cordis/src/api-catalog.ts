@@ -1005,19 +1005,6 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
-    key: 'ocrPreprocess',
-    summary: 'Runs the OCR preprocessing pipeline.',
-    description: 'Runs the OCR preprocessing pipeline. Mounting the plugin registers a pre-step listener that rewrites image-bearing user messages when the model that will serve the request does not accept images, and exposes handlesImages so host admission gates can admit images for text-only models.',
-    methods: [
-      {
-        signature: 'handlesImages(): boolean',
-        description: 'Whether a usable OCR route is configured, so image admission gates can accept images for text-only models.',
-        parameters: [],
-        returns: 'true when both provider and model are non-empty.',
-      },
-    ],
-  },
-  {
     key: 'permissionPresets',
     summary: 'Owns the deployment\'s permission presets and their write path.',
     description: 'Owns the deployment\'s permission presets and their write path. Requires a confining `ctx.shell` executor and `ctx.approval`; unmatched knob values are reported as CUSTOM_PRESET, not an error.',

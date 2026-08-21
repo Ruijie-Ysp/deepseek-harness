@@ -641,17 +641,6 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 来源：[`packages/core/session/src/types.ts:336`](../packages/core/session/src/types.ts)
 
-<a id="sessionocr-request--log-only"></a>
-
-#### `session/ocr-request` — log-only
-
-```ts persistence-catalog
-/** Log-only pre-dispatch record of one OCR preprocessing call. */
-'session/ocr-request': SessionOcrRequestEventData
-```
-
-来源：[`packages/context/ocr-preprocess/src/types.ts:25`](../packages/context/ocr-preprocess/src/types.ts)
-
 <a id="sessiontitle--log-only"></a>
 
 #### `session/title` — log-only

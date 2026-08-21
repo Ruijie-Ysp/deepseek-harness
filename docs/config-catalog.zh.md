@@ -1423,24 +1423,6 @@ export interface Config {
 
 来源：[`packages/feedback/message-feedback/src/index.ts:49`](../packages/feedback/message-feedback/src/index.ts)
 
-<a id="deepseek-aidsh-ocr-preprocess"></a>
-
-## `@deepseek-ai/dsh-ocr-preprocess`
-
-需要：`llm`
-
-```ts config-catalog
-/** Composition entry for the OCR route. */
-export interface Config {
-  /** Registered provider route of the OCR model. */
-  provider: string
-  /** Provider-owned OCR model id. */
-  model: string
-}
-```
-
-来源：[`packages/context/ocr-preprocess/src/index.ts:55`](../packages/context/ocr-preprocess/src/index.ts)
-
 <a id="deepseek-aidsh-permission-presets"></a>
 
 ## `@deepseek-ai/dsh-permission-presets`

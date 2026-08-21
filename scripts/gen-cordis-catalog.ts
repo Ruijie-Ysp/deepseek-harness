@@ -70,7 +70,6 @@ export const SERVICE_PAGE: Record<string, string> = {
   e2b: 'subprocess.md',
   fileReferences: 'session-reference.md',
   fs: 'filesystem.md',
-  ocrPreprocess: 'ocr-preprocess.md',
   goals: 'goal.md',
   webServer: 'web-server.md',
   invariants: 'invariants.md',

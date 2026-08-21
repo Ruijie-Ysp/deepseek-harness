@@ -639,17 +639,6 @@ Source: [`packages/schedule/schedule/src/types.ts:219`](../packages/schedule/sch
 
 Source: [`packages/core/session/src/types.ts:358`](../packages/core/session/src/types.ts)
 
-<a id="sessionocr-request--log-only"></a>
-
-#### `session/ocr-request` — log-only
-
-```ts persistence-catalog
-/** Log-only pre-dispatch record of one OCR preprocessing call. */
-'session/ocr-request': SessionOcrRequestEventData
-```
-
-Source: [`packages/context/ocr-preprocess/src/types.ts:25`](../packages/context/ocr-preprocess/src/types.ts)
-
 <a id="sessiontitle--log-only"></a>
 
 #### `session/title` — log-only

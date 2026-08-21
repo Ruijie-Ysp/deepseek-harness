@@ -71,9 +71,6 @@ flowchart LR
   pkg_file_reference["file-reference"]
   svc_fileReferences["ctx.fileReferences<br/>File reference discovery"]
   pkg_file_reference_local["file-reference-local"]
-  pkg_ocr_preprocess["ocr-preprocess"]
-  svc_ocrPreprocess["ctx.ocrPreprocess<br/>Automatic OCR preprocessing of image messages"]
-  pkg_acp["acp"]
   svc_sessionReferenceResolver["ctx.sessionReferenceResolver<br/>Cross-session snapshot preparation"]
   pkg_session_title["session-title"]
   svc_sessionTitle["ctx.sessionTitle<br/>Log-backed session titles"]
@@ -109,6 +106,7 @@ flowchart LR
   pkg_skill_badge["skill-badge"]
   pkg_skill_filesystem["skill-filesystem"]
   svc_agents["ctx.agents<br/>Agent service"]
+  pkg_acp["acp"]
   pkg_agent_default_model["agent-default-model"]
   svc_agentDefaultModel["ctx.agentDefaultModel<br/>Default Agent model selection"]
   pkg_headless["headless"]
@@ -248,7 +246,6 @@ flowchart LR
   pkg_lsp_local --> svc_lsp
   pkg_message_feedback --> svc_messageFeedback
   pkg_modules --> svc_clientModules
-  pkg_ocr_preprocess --> svc_ocrPreprocess
   pkg_permission_presets --> svc_permissionPresets
   pkg_plan_mode --> svc_planMode
   pkg_pwsh_local --> svc_shell
@@ -343,9 +340,6 @@ flowchart LR
   svc_llm --> pkg_agent_loop
   svc_llm --> pkg_compaction_basic
   svc_lsp --> pkg_tool_lsp
-  svc_ocrPreprocess --> pkg_acp
-  svc_ocrPreprocess --> pkg_host_runtime
-  svc_ocrPreprocess --> pkg_llm_replay
   svc_sandbox --> pkg_bash_sandbox
   svc_sandbox --> pkg_terminal_bash
   svc_sandboxPolicy --> pkg_bash_sandbox
@@ -447,7 +441,6 @@ flowchart LR
 | `ctx.workspaceRegistry` | `core` | [`workspace`](../packages/workspace/workspace) | - | `apiproxy` | - | 通过领域设施拥有带 WorkspaceId 品牌类型的记录；稳定的 sessionIds 账户驱动 Host RPC 与 GUI 投影。 |
 | `ctx.sessionQuery` | `seam` | [`session-query`](../packages/session-query/session-query) | [`session-query-sqlite`](../packages/session-query/session-query-sqlite) | [`session-reference`](../packages/context/session-reference), [`tool-session-query`](../packages/session-query/tool-session-query) | - | 该接口提供精确读取、过滤和追踪；具体后端还提供全文协调、排序、摘要片段和游标世代，而模型消费方负责工作区权限与不含游标的渲染。 |
 | `ctx.fileReferences` | `seam` | [`file-reference`](../packages/context/file-reference) | [`file-reference-local`](../packages/context/file-reference-local) | - | - | 该接口通过其一元 Remote 契约返回指定 Agent cwd 内仅含路径的补全候选；提供方负责命名空间访问和排序，但不会读取文件内容。 |
-| `ctx.ocrPreprocess` | `core` | [`ocr-preprocess`](../packages/context/ocr-preprocess) | - | `host-runtime`, [`acp`](../packages/acp/acp), [`llm-replay`](../packages/test-support/llm-replay) | - | 在 pre-step 阶段，当服务模型不接受图片时，将图片块转换为识别文本；准入会查询 handlesImages()，以便为纯文本路由准入图片。 |
 | `ctx.sessionReferenceResolver` | `core` | [`session-reference`](../packages/context/session-reference) | - | - | - | 将当前表层中有界的对话快照投影为持久但不可信的消息上下文；Host 适配器负责提及语法。 |
 | `ctx.sessionTitle` | `seam` | [`session-title`](../packages/session/session-title) | [`session-title-first-prompt-llm`](../packages/session/session-title-first-prompt-llm), [`session-title-all-prompts-llm`](../packages/session/session-title-all-prompts-llm) | - | - | 负责确定性回退、最新标题折叠区，以及唯一的可选异步提供方注册。 |
 | `ctx.systemPrompt` | `core` | [`system-prompt`](../packages/core/system-prompt) | - | [`agent-loop`](../packages/core/agent-loop), [`tools`](../packages/core/tools), [`tool-fs`](../packages/fs/tool-fs), [`tool-terminal`](../packages/terminal/tool-terminal), [`tool-web`](../packages/web/tool-web) | - | 为每个步骤收集提示词各部分和面向模型的工具 schema。 |

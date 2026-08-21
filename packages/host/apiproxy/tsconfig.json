@@ -87,9 +87,6 @@
       "path": "../../interaction/user-questions"
     },
     {
-      "path": "../../context/ocr-preprocess"
-    },
-    {
       "path": "../../workspace/workspace"
     },
     {

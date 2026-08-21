@@ -106,7 +106,6 @@
     "@deepseek-ai/dsh-tool-todo": "workspace:^",
     "@deepseek-ai/dsh-tool-web": "workspace:^",
     "@deepseek-ai/dsh-tool-workflow": "workspace:^",
-    "@deepseek-ai/dsh-ocr-preprocess": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
     "@deepseek-ai/dsh-typert-protocol": "workspace:^",
     "@deepseek-ai/dsh-user-approval": "workspace:^",

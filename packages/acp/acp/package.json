@@ -42,7 +42,6 @@
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-user-approval": "workspace:^",
-    "@deepseek-ai/dsh-ocr-preprocess": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   },
   "devDependencies": {
@@ -55,7 +54,6 @@
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
     "@deepseek-ai/dsh-user-approval": "workspace:^",
-    "@deepseek-ai/dsh-ocr-preprocess": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   }
 }

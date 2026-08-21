@@ -27,9 +27,6 @@
       "path": "../../interaction/user-approval"
     },
     {
-      "path": "../../context/ocr-preprocess"
-    },
-    {
       "path": "../../runtime-diagnostics/invariants"
     }
   ]
