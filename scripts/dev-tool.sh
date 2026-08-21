@@ -14,6 +14,9 @@
 # Logs live in logs/<service>.log (previous run rotated to .1), PIDs in
 # logs/.pids/<service>.pid. The harness's own session logs (what the model
 # sees) land in $DSH_HOME/sessions (default ~/.dsh/sessions) independently.
+# The web service reads DEEPSEEK_API_KEY from the shell env or repo .env
+# (gitignored; set it there, never hardcode keys in this script) — with a
+# key it calls the real API, without it the mock LLM is used instead.
 # First start runs pnpm install / pnpm run build automatically when the
 # checkout lacks dependencies or built web artifacts (progress in setup.log).
 set -euo pipefail
@@ -181,6 +184,11 @@ start_service() {
     start_service mock || return 1
     extra="DEEPSEEK_API_KEY=dsh-dev-mock DEEPSEEK_BASE_URL=$MOCK_BASE_URL"
     echo "  web: DEEPSEEK_API_KEY unset — using mock LLM at $MOCK_BASE_URL"
+  elif [[ "$s" == web ]]; then
+    echo "  web: using DEEPSEEK_API_KEY from env/.env${DEEPSEEK_BASE_URL:+ (base $DEEPSEEK_BASE_URL)}"
+    if service_running mock; then
+      echo "  web: mock is still running but no longer needed — stop it with: dev-tool.sh stop mock"
+    fi
   fi
   launch "$s" "$extra" $(service_cmd "$s")
   tries=$(service_wait_tries "$s")
@@ -188,6 +196,23 @@ start_service() {
     echo "  $s: up at $(service_url "$s") (pid $(service_pid "$s"), log logs/$s.log)"
   else
     return 1
+  fi
+}
+
+# Export DEEPSEEK_API_KEY / DEEPSEEK_BASE_URL from the repo .env (gitignored)
+# when the shell env does not already carry them. Values are read raw, so keep
+# them unquoted in .env.
+load_env_keys() {
+  local env_file="$ROOT/.env" line
+  [[ -f "$env_file" ]] || return 0
+  # grep exits 1 on no match; `|| true` keeps the pipeline 0 under pipefail.
+  if [[ -z "${DEEPSEEK_API_KEY:-}" ]]; then
+    line=$(grep -E '^DEEPSEEK_API_KEY=' "$env_file" | head -1 || true)
+    if [[ -n "$line" ]]; then export "DEEPSEEK_API_KEY=${line#DEEPSEEK_API_KEY=}"; fi
+  fi
+  if [[ -z "${DEEPSEEK_BASE_URL:-}" ]]; then
+    line=$(grep -E '^DEEPSEEK_BASE_URL=' "$env_file" | head -1 || true)
+    if [[ -n "$line" ]]; then export "DEEPSEEK_BASE_URL=${line#DEEPSEEK_BASE_URL=}"; fi
   fi
 }
 
@@ -204,6 +229,7 @@ do_start() {
   fi
   mkdir -p "$PID_DIR"
   ensure_tsx
+  load_env_keys
   for s in "${svcs[@]}"; do
     [[ "$s" == web ]] && ensure_web_build
     start_service "$s" || failed=1
