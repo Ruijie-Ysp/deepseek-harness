@@ -6,23 +6,17 @@ import type {
 import {
   contextForm, contextProvenance, isAppendSurfaceEvent, isReplacementSurfaceEvent,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { InboxState } from './inbox.ts'
 import { chatNode } from './common.ts'
-import type { OcrRequestState } from './ocr-request.ts'
 
 interface ReferencedUserMessageNode extends UserMessageNode {
   /** Labels cited by the immediately following session-reference context. */
   readonly referenceLabels?: readonly string[]
-  /** Image attachments OCR-preprocessed out of this message's content. */
-  readonly ocrImages?: readonly { readonly attachment: ImageAttachmentRef }[]
 }
 
 interface ReferencedSteeringMessageNode extends SteeringMessageNode {
   /** Labels cited by the immediately following session-reference context. */
   readonly referenceLabels?: readonly string[]
-  /** Image attachments OCR-preprocessed out of this message's content. */
-  readonly ocrImages?: readonly { readonly attachment: ImageAttachmentRef }[]
 }
 
 type MessageNode = ReferencedUserMessageNode | ReferencedSteeringMessageNode | ContextMessageNode
@@ -70,10 +64,6 @@ export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
       }
     }
     const claimed = reader.previous<InboxState>('inbox-next-step')?.state.claimed.has(String(event.data.id)) === true
-    const ocr = reader.previous<OcrRequestState>('ocr-request')
-    const ocrImages = ocr !== undefined && ocr.state.messageId === String(event.data.id)
-      ? ocr.state.imageRefs.map(attachment => ({ attachment }))
-      : undefined
     return claimed
       ? {
         kind: 'steering',
@@ -82,7 +72,6 @@ export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
         time: event.time,
         content: event.data.content,
         source: event.data.source,
-        ...ocrImages === undefined ? {} : { ocrImages },
       }
       : {
         kind: 'user',
@@ -90,7 +79,6 @@ export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
         time: event.time,
         content: event.data.content,
         source: event.data.source,
-        ...ocrImages === undefined ? {} : { ocrImages },
       }
   },
   update: context => context.state,

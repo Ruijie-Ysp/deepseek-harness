@@ -8,7 +8,6 @@ import type { ReactNode } from 'react'
 import type {
   ModelRetryNode, SteeringMessageNode, TurnErrorNode, UserEditMessageNode, UserMessageNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { JsonBlock, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
 import { ReferenceIcon } from '../reference/ReferenceIcon.tsx'
@@ -215,7 +214,7 @@ function projectUserText(text: string, sessionLabels: readonly string[]): ReactN
 
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({
-  content, renderMessageImages, actions, pending = false, edited = false, referenceLabels = [], ocrImages = [], t,
+  content, renderMessageImages, actions, pending = false, edited = false, referenceLabels = [], t,
 }: {
   content: readonly unknown[]
   renderMessageImages: ChatNodeOwnerProps['renderMessageImages']
@@ -227,8 +226,6 @@ function UserStyleBubble({
   edited?: boolean
   /** Exact session mention labels associated by the adjacent recall node. */
   referenceLabels?: readonly string[]
-  /** Image attachments OCR-preprocessed out of the message content, still rendered alongside it. */
-  ocrImages?: readonly { readonly attachment: ImageAttachmentRef }[]
   t: ChatViewSlotProps['t']
 }): ReactNode {
   const { text, images, rest } = contentParts(content)
@@ -237,7 +234,7 @@ function UserStyleBubble({
   return (
     <div className={css.userRow} data-pending-steering={pending || undefined} data-time-hover-root>
       <div className={css.userStack}>
-        {renderMessageImages({ images: [...ocrImages, ...images], align: 'end' })}
+        {renderMessageImages({ images, align: 'end' })}
         {showBubble && <div className={css.bubble}>
           {edited && <span className={css.editedBadge}>{t('message.edited')}</span>}
           {projectUserText(text, referenceLabels)}
@@ -308,7 +305,6 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
       content={data.content}
       renderMessageImages={renderMessageImages}
       {...data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }}
-      {...data.ocrImages === undefined ? {} : { ocrImages: data.ocrImages }}
       t={t}
       actions={text => (
         <MessageIconActions

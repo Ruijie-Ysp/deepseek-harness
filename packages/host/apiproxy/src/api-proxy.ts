@@ -89,9 +89,6 @@ import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-a
 // Side-effect type import: resolves the `approval/request` waterfall and
 // `ctx.get('approval')` without a value dependency on the seam (optional composition).
 import type {} from '@deepseek-ai/dsh-user-approval'
-// Side-effect type import: resolves `ctx.get('ocrPreprocess')` without a value
-// dependency on the seam (optional composition).
-import type {} from '@deepseek-ai/dsh-ocr-preprocess'
 import { approvalResponsePayloadSchema } from './api/approvals.schema.ts'
 import { imageLimitsProjectionSchema, sessionListMetadataProjectionSchema } from './api/sessions.schema.ts'
 import { questionResponsePayloadSchema } from './api/questions.schema.ts'
@@ -2213,11 +2210,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             })
             const pendingImage = [...found.agent.inbox.nextTurn, ...found.agent.inbox.nextStep]
               .some(message => contentHasImage(message.content))
-            // OCR preprocessing converts image messages to text at pre-step, so
-            // a text-only model can serve a session whose pending images it
-            // will never see raw.
-            const ocrHandlesImages = ctx.get('ocrPreprocess')?.handlesImages() === true
-            if ((pendingImage || messagesHaveImage(found.agent.session.deriveMessages())) && !ocrHandlesImages) {
+            if (pendingImage || messagesHaveImage(found.agent.session.deriveMessages())) {
               const info = await ctx.llm.resolveModelInfo(resolved.provider, resolved.model)
               if (info.inputModalities !== undefined && !info.inputModalities.includes('image')) {
                 return err(request, {
@@ -2405,10 +2398,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const hasImage = content.some(part => part.type === 'image')
         const admit = async (): Promise<RpcResponse<{ accepted: true }>> => {
           try {
-            // OCR preprocessing converts the admitted image to text at
-            // pre-step, so a text-only current model can accept it.
-            const ocrHandlesImages = ctx.get('ocrPreprocess')?.handlesImages() === true
-            if (hasImage && !ocrHandlesImages) {
+            if (hasImage) {
               const current = selectionFor(agent).current
               const modelInfo = await ctx.llm.resolveModelInfo(current.provider, current.model)
               if (modelInfo.inputModalities !== undefined && !modelInfo.inputModalities.includes('image')) {
