@@ -7,6 +7,8 @@
 #   dev-tool.sh restart [service...] stop, then start
 #   dev-tool.sh status               per-service state, ports, and log paths
 #   dev-tool.sh logs [service...]    tail -f service logs (default: all)
+#   dev-tool.sh check                verify web health: page, every client
+#                                    bundle, and the session list
 #
 # Services: web (dsh web, http://127.0.0.1:3080), mock (mock LLM,
 # http://127.0.0.1:8000/v1), docs (VitePress, http://127.0.0.1:5173).
@@ -300,6 +302,32 @@ do_logs() {
   exec tail -f "${files[@]/#/$LOG_DIR/}"
 }
 
+do_check() {
+  local base="http://127.0.0.1:$(service_port web)" failed=0 items
+  echo "web page:"
+  curl -s -o /dev/null -w "  index: %{http_code}\n" "$base/"
+  echo "client bundles:"
+  local urls
+  urls=$(curl -s "$base/" | grep -o 'plugins/[^"]*' | sort -u)
+  local url code checked=0
+  for url in $urls; do
+    code=$(curl -s -o /dev/null -w "%{http_code}" "$base/$url")
+    checked=$((checked + 1))
+    if [[ "$code" != 200 ]]; then
+      echo "  BAD $code /$url"
+      failed=1
+    fi
+  done
+  echo "  $checked bundles, all 200"
+  items=$(curl -s -X POST "$base/api/session.list" \
+    -H 'Content-Type: application/json' \
+    -d '{"type":"client-request","rpcId":"check","method":"session.list","payload":{}}' \
+    | grep -o '"sessionId"' | wc -l | tr -d ' ')
+  echo "session list: $items sessions readable"
+  if (( failed )); then echo "check FAILED"; exit 1; fi
+  echo "check OK"
+}
+
 main() {
   local cmd="${1:-help}"
   shift || true
@@ -308,6 +336,7 @@ main() {
     stop)    do_stop "$@" ;;
     restart) do_stop "$@"; do_start "$@" ;;
     status)  do_status ;;
+    check)   do_check ;;
     logs)    do_logs "$@" ;;
     help|-h|--help) usage ;;
     *) echo "unknown command: $cmd" >&2; usage; exit 2 ;;
