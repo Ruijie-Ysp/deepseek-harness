@@ -166,6 +166,23 @@ ensure_web_build() {
     || { echo "  build failed — tail logs/setup.log" >&2; exit 1; }
 }
 
+# Prime the web cold-session scan: the first session.list triggers the async
+# persistence listing, so the UI would otherwise open against a momentarily
+# empty list. Poll until the count is stable, then report it.
+warm_session_list() {
+  local url="http://127.0.0.1:$(service_port web)/api/session.list"
+  local body='{"type":"client-request","rpcId":"warm-up","method":"session.list","payload":{}}'
+  local prev="" now=""
+  for _ in $(seq 1 12); do
+    now=$(curl -s -X POST "$url" -H 'Content-Type: application/json' -d "$body" \
+      | grep -o '"sessionId"' | wc -l | tr -d ' ')
+    if [[ -n "$now" && "$now" == "$prev" ]]; then break; fi
+    prev="$now"
+    sleep 1
+  done
+  echo "  web: session list warm (${now:-0} sessions readable)"
+}
+
 start_service() {
   local s="$1" port busy extra tries
   if service_running "$s"; then
@@ -193,6 +210,7 @@ start_service() {
   launch "$s" "$extra" $(service_cmd "$s")
   tries=$(service_wait_tries "$s")
   if wait_port "$s" "$port" "$tries"; then
+    [[ "$s" == web ]] && warm_session_list
     echo "  $s: up at $(service_url "$s") (pid $(service_pid "$s"), log logs/$s.log)"
   else
     return 1
