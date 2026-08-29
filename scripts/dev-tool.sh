@@ -8,7 +8,9 @@
 #   dev-tool.sh status               per-service state, ports, and log paths
 #   dev-tool.sh logs [service...]    tail -f service logs (default: all)
 #   dev-tool.sh check                verify web health: page, every client
-#                                    bundle, and the session list
+#                                    bundle, and the session list (scrapes the
+#                                    startup token from logs/web.log and probes
+#                                    with the session cookie)
 #
 # Services: web (dsh web, http://127.0.0.1:3080), mock (mock LLM,
 # http://127.0.0.1:8000/v1), docs (VitePress, http://127.0.0.1:5173).
@@ -168,16 +170,48 @@ ensure_web_build() {
     || { echo "  build failed — tail logs/setup.log" >&2; exit 1; }
 }
 
-# Prime the web cold-session scan: the first session.list triggers the async
+# The web app requires token auth. Each startup mints a random token and
+# prints `dsh web: http://…/?token=<v>` to logs/web.log; exchanging it at
+# `/?token=` answers 303 with a 30-day HMAC session cookie that survives
+# restarts (the token does not). Scrape the freshest startup line's token.
+web_auth_token() {
+  [[ -f "$LOG_DIR/web.log" ]] || return 1
+  grep -o 'token=[A-Za-z0-9_-]*' "$LOG_DIR/web.log" | tail -1 | cut -d= -f2
+}
+
+# Exchange the launch token for the session cookie; echo `name=value` for a
+# Cookie header, or fail when the startup line has not appeared yet.
+web_auth_cookie() {
+  local base="http://127.0.0.1:$(service_port web)" token cookie
+  # The port listens before the loader settles and prints the URL; wait for it.
+  for _ in $(seq 1 10); do
+    token=$(web_auth_token || true)
+    [[ -n "$token" ]] && break
+    sleep 0.5
+  done
+  [[ -n "$token" ]] || return 1
+  cookie=$(curl -s -o /dev/null -D - "$base/?token=$token" \
+    | awk 'tolower($1)=="set-cookie:"{sub(/\r$/, "", $2); print $2; exit}' \
+    | cut -d';' -f1 || true)
+  [[ -n "$cookie" ]] || return 1
+  echo "$cookie"
+}
+
+# Prime the web cold-session scan: the first session/list triggers the async
 # persistence listing, so the UI would otherwise open against a momentarily
 # empty list. Poll until the count is stable, then report it.
 warm_session_list() {
-  local url="http://127.0.0.1:$(service_port web)/api/session.list"
-  local body='{"type":"client-request","rpcId":"warm-up","method":"session.list","payload":{}}'
-  local prev="" now=""
+  local base="http://127.0.0.1:$(service_port web)"
+  local body='{"type":"client-request","rpcId":"warm-up","method":"session/list","payload":{"args":{"_request":{}}}}'
+  local cookie prev="" now=""
+  if ! cookie=$(web_auth_cookie); then
+    echo "  web: session list not warmed (no auth token printed yet)"
+    return 0
+  fi
   for _ in $(seq 1 12); do
-    now=$(curl -s -X POST "$url" -H 'Content-Type: application/json' -d "$body" \
-      | grep -o '"sessionId"' | wc -l | tr -d ' ')
+    now=$(curl -s -X POST "$base/api/session/list" \
+      -H 'Content-Type: application/json' -H "Cookie: $cookie" -d "$body" \
+      | grep -o '"sessionId"' | wc -l | tr -d ' ' || true)
     if [[ -n "$now" && "$now" == "$prev" ]]; then break; fi
     prev="$now"
     sleep 1
@@ -303,13 +337,20 @@ do_logs() {
 }
 
 do_check() {
-  local base="http://127.0.0.1:$(service_port web)" failed=0 items
+  local base="http://127.0.0.1:$(service_port web)" failed=0 cookie code items
+  if ! cookie=$(web_auth_cookie); then
+    echo "no auth token in logs/web.log — is web running? (dev-tool.sh start web)" >&2
+    exit 1
+  fi
   echo "web page:"
-  curl -s -o /dev/null -w "  index: %{http_code}\n" "$base/"
+  code=$(curl -s -o /dev/null -w "%{http_code}" -H "Cookie: $cookie" "$base/")
+  echo "  index: $code"
+  if [[ "$code" != 200 ]]; then failed=1; fi
   echo "client bundles:"
   local urls
-  urls=$(curl -s "$base/" | grep -o 'plugins/[^"]*' | sort -u)
-  local url code checked=0
+  # URLs embedded in the page's JSON config carry HTML-escaped ampersands.
+  urls=$(curl -s -H "Cookie: $cookie" "$base/" | grep -o 'plugins/[^"]*' | sed 's/&amp;/\&/g' | sort -u || true)
+  local url checked=0
   for url in $urls; do
     code=$(curl -s -o /dev/null -w "%{http_code}" "$base/$url")
     checked=$((checked + 1))
@@ -319,11 +360,11 @@ do_check() {
     fi
   done
   echo "  $checked bundles, all 200"
-  items=$(curl -s -X POST "$base/api/session.list" \
-    -H 'Content-Type: application/json' \
-    -d '{"type":"client-request","rpcId":"check","method":"session.list","payload":{}}' \
-    | grep -o '"sessionId"' | wc -l | tr -d ' ')
-  echo "session list: $items sessions readable"
+  items=$(curl -s -X POST "$base/api/session/list" \
+    -H 'Content-Type: application/json' -H "Cookie: $cookie" \
+    -d '{"type":"client-request","rpcId":"check","method":"session/list","payload":{"args":{"_request":{}}}}' \
+    | grep -o '"sessionId"' | wc -l | tr -d ' ' || true)
+  echo "session list: ${items:-0} sessions readable"
   if (( failed )); then echo "check FAILED"; exit 1; fi
   echo "check OK"
 }
