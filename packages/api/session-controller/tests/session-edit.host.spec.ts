@@ -39,6 +39,7 @@ async function harness(): Promise<{
     content: [{ type: 'text', text: 'original' }], source: { kind: 'user' },
   }), { surfaceOp: 'append' })
   session.append('assistant/message', {
+    stream: [],
     turn: 1, step: 1,
     message: createAssistantMessage({
       content: [{ type: 'text', text: 'reply' }],
@@ -86,7 +87,7 @@ describe('session.editPrompt', () => {
       sessionId,
       atSeq: 9999,
       content: [{ type: 'text', text: 'rewritten' }],
-    }))).rejects.toMatchObject({ failure: { code: 'edit-target-invalid', details: { atSeq: 9999 } } })
+    }))).rejects.toMatchObject({ code: 'session/edit-target-invalid', details: { atSeq: 9999 } })
     expect(followup).not.toHaveBeenCalled()
     await ctx.fiber.dispose()
   })
@@ -98,7 +99,7 @@ describe('session.editPrompt', () => {
       sessionId,
       atSeq: 2,
       content: [{ type: 'text', text: 'rewritten' }],
-    }))).rejects.toMatchObject({ failure: { code: 'edit-target-invalid' } })
+    }))).rejects.toMatchObject({ code: 'session/edit-target-invalid' })
     expect(followup).not.toHaveBeenCalled()
     await ctx.fiber.dispose()
   })
@@ -111,7 +112,8 @@ describe('session.editPrompt', () => {
       content: [{ type: 'text', text: 'rewritten' }],
       clientTimeZone: 'Not/A_Real_Zone',
     }))).rejects.toMatchObject({
-      failure: { code: 'invalid-time-zone', details: { value: 'Not/A_Real_Zone' } },
+      code: 'session/invalid-time-zone',
+      details: { value: 'Not/A_Real_Zone' },
     })
     expect(followup).not.toHaveBeenCalled()
     await ctx.fiber.dispose()
@@ -127,7 +129,7 @@ describe('session.editPrompt', () => {
       ] as never,
       source: { kind: 'user' },
     }), { surfaceOp: 'append' })
-    const imageSeq = [...agent.session.events].reverse()
+    const imageSeq = [...agent.session.snapshotEvents()].reverse()
       .find(event => event.type === 'user/message')?.seq
     expect(imageSeq).toBeDefined()
 
