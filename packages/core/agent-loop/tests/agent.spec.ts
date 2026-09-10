@@ -188,13 +188,14 @@ describe('Agent', () => {
 
     const editEvent = agent.session.snapshotEvents().find(event => event.type === 'user/edit')
     expect(editEvent).toBeDefined()
-    expect(editEvent!.surfaceOp).toEqual({ op: 'replace', start: userSeq, end: assistantSeq })
+    expect(editEvent!.surfaceOp).toEqual({ op: 'replace', startSeq: userSeq, endSeq: assistantSeq })
     expect(editEvent!.sourceEventSeqs).toEqual([userSeq, assistantSeq])
     // No duplicate user/message was appended for the rewrite.
     expect(agent.session.snapshotEvents().filter(event => event.type === 'user/message')).toHaveLength(1)
-    // Model history is the edited prompt followed by the regenerated reply.
+    // Model history is the system prompt, the edited prompt, and the regenerated reply.
     const messages = agent.session.deriveMessages()
-    expect(messages.map(message => message.content)).toEqual([
+    expect(messages.map(message => message.role)).toEqual(['system', 'user', 'assistant'])
+    expect(messages.slice(1).map(message => message.content)).toEqual([
       [{ type: 'text', text: 'rewritten prompt' }],
       [{ type: 'text', text: 'regenerated reply' }],
     ])
