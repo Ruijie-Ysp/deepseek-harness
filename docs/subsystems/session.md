@@ -54,6 +54,14 @@ interface SessionEventMap {
    */
   'user/message': UserMessage
   /**
+   * A human rewrite of an earlier user message: the loop logs this event with a
+   * `replace` surfaceOp shadowing the targeted surface node and everything
+   * after it, then runs one new turn against `message`. The appended-only
+   * transcript keeps the original; `deriveMessages` projects the edited
+   * `message` in user role at the replaced position.
+   */
+  'user/edit': UserEditEvent
+  /**
    * The rendered system prompt on the model-visible surface. The loop appends
    * the first one as surface node 0 before the step's first `user/message`.
    * A prepared in-history route can append nonempty changes in a continuing
@@ -66,14 +74,6 @@ interface SessionEventMap {
    * the same route and series rule; empty nodes never restore older text.
    */
   'system/message': { turn: number; step: number; message: SystemMessage }
-  /**
-   * A human rewrite of an earlier user message: the loop logs this event with a
-   * `replace` surfaceOp shadowing the targeted surface node and everything
-   * after it, then runs one new turn against `message`. The appended-only
-   * transcript keeps the original; `deriveMessages` projects the edited
-   * `message` in user role at the replaced position.
-   */
-  'user/edit': UserEditEvent
   /**
    * Assembled assistant message for one step (derived history uses this).
    * Carries the step's `usage` when the adapter reported token accounting, so
@@ -873,11 +873,11 @@ workspaceDesktop(): { name: string; available: boolean; fileManager: 'finder' | 
 @Remote('attachment') attachment(request: SessionAttachmentRequest): Promise<SessionAttachmentValue>
 
 /**
- * Mutate one still-pending queue occurrence on a live Agent.
+ * Mutate one still-pending queue occurrence, resuming a cold Agent first.
  * @param request - Session, queue item, and requested mutation.
  * @returns acknowledgement that the queue mutation was applied.
  */
-@Remote('updateQueue') updateQueue(request: SessionUpdateQueueRequest): SessionUpdateQueueValue
+@Remote('updateQueue') updateQueue(request: SessionUpdateQueueRequest): Promise<SessionUpdateQueueValue>
 
 /**
  * Cancel one active Agent turn without dropping its pending inbox.

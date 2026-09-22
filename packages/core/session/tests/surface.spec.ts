@@ -958,7 +958,7 @@ describe('user/edit rewrites', () => {
   })
 
   it('rejects a replace whose sourceEventSeqs omit a shadowed node', () => {
-    const s = Session.create(SessionId('edit-provenance'))
+    const s = Session.create(SessionId('edit-shadow-seqs'))
     const original = s.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'one' }], source: { kind: 'user' },
     }), { surfaceOp: 'append' })
